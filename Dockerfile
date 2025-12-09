@@ -26,11 +26,11 @@ FROM node:22-alpine
 # 设置工作目录
 WORKDIR /app
 
-# 复制 package 文件
-COPY package*.json ./
+# 只复制 package.json (不要 package-lock.json,避免版本冲突)
+COPY package.json ./
 
-# 只安装生产依赖 + tsx (运行时需要)
-RUN npm ci --omit=dev && \
+# 安装生产依赖 + 运行时需要的包
+RUN npm install --production && \
     npm install tsx sql.js
 
 # 从构建阶段复制构建产物
