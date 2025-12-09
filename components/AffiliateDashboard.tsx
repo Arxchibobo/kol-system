@@ -20,7 +20,6 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const [myTasks, setMyTasks] = useState<AffiliateTask[]>([]);
   const [stats, setStats] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
-  const [simulating, setSimulating] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   
   // Modal State
@@ -80,32 +79,14 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     setTimeout(() => setCopiedLink(null), 2000);
   };
 
-  const handleTestRedirect = async (trackingLink: string) => {
-      setSimulating(trackingLink);
-      
-      // Determine destination URL
-      // For testing, we ALWAYS want to use the tracking link itself to test the full flow
-      // including the React App redirect interception.
-      const targetUrl = trackingLink;
-      
-      // If it's a stateless link, we also need to manually ping the store to update the "local" stats for display
-      // because the backend won't know about this click if it's handled entirely client-side, 
-      // but we want the UI to update for the user.
-      if (trackingLink.includes('/r/')) {
-           MockStore.simulateLinkClick(trackingLink).catch(console.error);
-      }
-
-      // 1. Open URL immediately (Direct Open / Real User Behavior)
-      window.open(targetUrl, '_blank');
-      
-      // 2. Wait for backend/local processing
-      await new Promise(r => setTimeout(r, 2000));
-      
-      // 3. Reload Data
-      await loadData();
-      
-      setSimulating(null);
+  // 刷新统计数据
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefreshStats = async () => {
+    setRefreshing(true);
+    await loadData();
+    setTimeout(() => setRefreshing(false), 500);
   };
+
 
   const renderNav = () => (
     <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit mb-8 transition-colors">
@@ -157,7 +138,18 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
             </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid - Performance (Real-time) */}
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Performance (Real-time)</h3>
+            <button
+                onClick={handleRefreshStats}
+                disabled={refreshing}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                title="刷新数据"
+            >
+                <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+            </button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors">
                 <h3 className="text-slate-500 dark:text-slate-400 text-sm">{t('affiliate.totalClicks')}</h3>
@@ -301,18 +293,6 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                                         >
                                             {copiedLink === at.uniqueTrackingLink ? <CheckCircle size={16} className="text-emerald-500" /> : <Copy size={16} />}
                                             <span className="hidden sm:inline">{copiedLink === at.uniqueTrackingLink ? 'Copied' : 'Copy'}</span>
-                                        </button>
-                                        <button 
-                                            onClick={() => handleTestRedirect(at.uniqueTrackingLink)}
-                                            disabled={!!simulating}
-                                            className="px-3 py-2 bg-emerald-600/10 border border-emerald-600/30 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 rounded-md transition-colors flex items-center gap-2 text-sm whitespace-nowrap min-w-[120px] justify-center"
-                                            title="Simulate a user clicking this link (Auto Redirect)"
-                                        >
-                                            {simulating === at.uniqueTrackingLink ? (
-                                                <><Loader2 size={16} className="animate-spin" /> Redirecting...</>
-                                            ) : (
-                                                <><Play size={16} /> {t('affiliate.testRedirect')}</>
-                                            )}
                                         </button>
                                     </div>
                                 </div>

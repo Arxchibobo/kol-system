@@ -64,6 +64,20 @@ export async function initDB() {
         `);
         db.run(`CREATE INDEX IF NOT EXISTS idx_clicks_link_id ON clicks(link_id);`);
 
+        // 3. 用户资料表 (存储达人的个人信息)
+        db.run(`
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                email TEXT,
+                follower_count INTEGER DEFAULT 0,
+                tags TEXT,
+                avatar TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         // 保存数据库到文件
         saveDB();
 
@@ -178,4 +192,192 @@ export async function getCreatorDetailedStats(creatorId: string) {
         linksCreated: linkResult[0]?.values[0]?.[0] || 0,
         lastClickAt: recentClickResult[0]?.values[0]?.[0] || null
     };
+}
+
+/**
+ * 获取全局统计数据 (所有达人的汇总)
+ */
+export async function getAllTotalStats() {
+    const database = await initDB();
+
+    // 1. 总点击数
+    const totalClicksResult = database.exec(`SELECT SUM(click_count) as total FROM links`);
+
+    // 2. 总短链接数
+    const totalLinksResult = database.exec(`SELECT COUNT(*) as total FROM links`);
+
+    // 3. 总 campaign 数
+    const totalCampaignsResult = database.exec(`SELECT COUNT(DISTINCT campaign_id) as total FROM links`);
+
+    return {
+        totalClicks: totalClicksResult[0]?.values[0]?.[0] || 0,
+        totalLinks: totalLinksResult[0]?.values[0]?.[0] || 0,
+        totalCampaigns: totalCampaignsResult[0]?.values[0]?.[0] || 0
+    };
+}
+
+/**
+ * 检测异常点击行为
+ * 规则:
+ * 1. 同一 IP 在 1 分钟内点击同一链接 > 5 次
+ * 2. 同一 IP 在 1 小时内点击不同链接 > 20 次
+ */
+export async function detectAnomalies() {
+    const database = await initDB();
+    const anomalies: any[] = [];
+
+    // 规则 1: 同一 IP 短时间内重复点击同一链接
+    const rule1Result = database.exec(`
+        SELECT
+            clicks.ip_address,
+            links.code,
+            links.creator_user_id,
+            COUNT(*) as click_count,
+            MAX(clicks.clicked_at) as last_click
+        FROM clicks
+        JOIN links ON clicks.link_id = links.id
+        WHERE clicks.clicked_at >= datetime('now', '-1 minute')
+        GROUP BY clicks.ip_address, links.code
+        HAVING click_count > 5
+        ORDER BY click_count DESC
+    `);
+
+    if (rule1Result.length > 0 && rule1Result[0].values.length > 0) {
+        rule1Result[0].values.forEach((row: any) => {
+            anomalies.push({
+                id: `anomaly-${Date.now()}-${Math.random()}`,
+                type: 'high_frequency',
+                linkCode: row[1],
+                creatorId: row[2],
+                ipAddress: row[0],
+                clickCount: row[3],
+                detectedAt: row[4],
+                severity: row[3] > 10 ? 'high' : 'medium',
+                details: `IP ${row[0]} 在 1 分钟内点击 ${row[3]} 次`
+            });
+        });
+    }
+
+    // 规则 2: 同一 IP 短时间内点击大量不同链接
+    const rule2Result = database.exec(`
+        SELECT
+            clicks.ip_address,
+            COUNT(DISTINCT links.code) as unique_links,
+            MAX(clicks.clicked_at) as last_click
+        FROM clicks
+        JOIN links ON clicks.link_id = links.id
+        WHERE clicks.clicked_at >= datetime('now', '-1 hour')
+        GROUP BY clicks.ip_address
+        HAVING unique_links > 20
+        ORDER BY unique_links DESC
+    `);
+
+    if (rule2Result.length > 0 && rule2Result[0].values.length > 0) {
+        rule2Result[0].values.forEach((row: any) => {
+            anomalies.push({
+                id: `anomaly-${Date.now()}-${Math.random()}`,
+                type: 'suspicious_pattern',
+                ipAddress: row[0],
+                uniqueLinks: row[1],
+                detectedAt: row[2],
+                severity: row[1] > 50 ? 'high' : 'medium',
+                details: `IP ${row[0]} 在 1 小时内点击了 ${row[1]} 个不同链接`
+            });
+        });
+    }
+
+    return anomalies;
+}
+
+/**
+ * 更新用户资料
+ */
+export async function updateUserProfile(userId: string, data: {
+    followerCount?: number;
+    tags?: string[];
+    name?: string;
+    email?: string;
+    avatar?: string;
+}) {
+    const database = await initDB();
+
+    // 检查用户是否存在
+    const existingUser = database.exec(`SELECT id FROM users WHERE id = ?`, [userId]);
+
+    const tagsJson = data.tags ? JSON.stringify(data.tags) : null;
+
+    if (existingUser.length === 0 || existingUser[0].values.length === 0) {
+        // 用户不存在,插入新记录
+        database.run(
+            `INSERT INTO users (id, name, email, follower_count, tags, avatar, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [userId, data.name || '', data.email || '', data.followerCount || 0, tagsJson, data.avatar || '']
+        );
+    } else {
+        // 用户存在,更新记录
+        const updates: string[] = [];
+        const values: any[] = [];
+
+        if (data.followerCount !== undefined) {
+            updates.push('follower_count = ?');
+            values.push(data.followerCount);
+        }
+        if (data.tags !== undefined) {
+            updates.push('tags = ?');
+            values.push(tagsJson);
+        }
+        if (data.name !== undefined) {
+            updates.push('name = ?');
+            values.push(data.name);
+        }
+        if (data.email !== undefined) {
+            updates.push('email = ?');
+            values.push(data.email);
+        }
+        if (data.avatar !== undefined) {
+            updates.push('avatar = ?');
+            values.push(data.avatar);
+        }
+
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        values.push(userId);
+
+        if (updates.length > 0) {
+            database.run(
+                `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+                values
+            );
+        }
+    }
+
+    saveDB();
+}
+
+/**
+ * 获取用户资料
+ */
+export async function getUserProfile(userId: string) {
+    const database = await initDB();
+    const result = database.exec(`SELECT * FROM users WHERE id = ?`, [userId]);
+
+    if (result.length === 0 || result[0].values.length === 0) {
+        return null;
+    }
+
+    const columns = result[0].columns;
+    const values = result[0].values[0];
+    const row: any = {};
+    columns.forEach((col, idx) => {
+        row[col] = values[idx];
+    });
+
+    // 解析 tags JSON
+    if (row.tags) {
+        try {
+            row.tags = JSON.parse(row.tags);
+        } catch (e) {
+            row.tags = [];
+        }
+    }
+
+    return row;
 }

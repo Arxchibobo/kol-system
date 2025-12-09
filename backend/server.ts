@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getCreatorDetailedStats } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -155,6 +155,67 @@ app.get('/api/admin/creator-stats/:userId', async (req, res) => {
     } catch (error) {
         console.error('Creator Stats Error:', error);
         res.status(500).json({ error: 'Failed to fetch creator stats' });
+    }
+});
+
+// 获取全局统计数据 (所有达人的总和)
+app.get('/api/admin/total-stats', async (req, res) => {
+    try {
+        const stats = await getAllTotalStats();
+        console.log('[Admin API] Fetched total stats:', stats);
+        res.json(stats);
+    } catch (error) {
+        console.error('Total Stats Error:', error);
+        res.status(500).json({ error: 'Failed to fetch total stats' });
+    }
+});
+
+// 获取异常点击预警列表
+app.get('/api/admin/anomalies', async (req, res) => {
+    try {
+        const anomalies = await detectAnomalies();
+        console.log(`[Admin API] Detected ${anomalies.length} anomalies`);
+        res.json(anomalies);
+    } catch (error) {
+        console.error('Anomalies Detection Error:', error);
+        res.status(500).json({ error: 'Failed to detect anomalies' });
+    }
+});
+
+// 更新用户资料
+app.put('/api/user/profile/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { followerCount, tags, name, email, avatar } = req.body;
+
+        await updateUserProfile(userId, {
+            followerCount,
+            tags,
+            name,
+            email,
+            avatar
+        });
+
+        console.log(`[API] Updated profile for user ${userId}`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Update Profile Error:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
+
+// 获取用户资料
+app.get('/api/user/profile/:userId', async (req, res) => {
+    try {
+        const profile = await getUserProfile(req.params.userId);
+        if (profile) {
+            res.json(profile);
+        } else {
+            res.status(404).json({ error: 'User not found' });
+        }
+    } catch (error) {
+        console.error('Get Profile Error:', error);
+        res.status(500).json({ error: 'Failed to get profile' });
     }
 });
 
