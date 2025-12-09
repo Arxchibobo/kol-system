@@ -42,6 +42,13 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   // 达人实时统计数据 (从数据库获取)
   const [creatorStats, setCreatorStats] = useState<Record<string, any>>({});
 
+  // 异常预警状态
+  const [anomalies, setAnomalies] = useState<any[]>([]);
+  const [showAnomaliesModal, setShowAnomaliesModal] = useState(false);
+
+  // 全局刷新状态
+  const [refreshing, setRefreshing] = useState(false);
+
   // Manual Add KOL State
   const [showAddKolModal, setShowAddKolModal] = useState(false);
   const [newKol, setNewKol] = useState<Partial<User>>({
@@ -54,6 +61,59 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
   const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1FrjSNSrNZTMgWl1dDBZIOTWQOgEO7An9UKNxUmRepG0/edit?gid=1698530545#gid=1698530545";
 
+  // 获取真实的全局统计数据
+  const fetchRealTotalStats = async () => {
+    try {
+      const response = await fetch('/api/admin/total-stats');
+      if (response.ok) {
+        const data = await response.json();
+        setOverviewData(prev => ({ ...prev, totalClicks: data.totalClicks }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch total stats:', error);
+    }
+  };
+
+  // 获取异常预警数据
+  const fetchAnomalies = async () => {
+    try {
+      const response = await fetch('/api/admin/anomalies');
+      if (response.ok) {
+        const data = await response.json();
+        setAnomalies(data);
+        setOverviewData(prev => ({ ...prev, flaggedCount: data.length }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch anomalies:', error);
+    }
+  };
+
+  // 全局刷新所有数据
+  const handleRefreshAll = async () => {
+    setRefreshing(true);
+    try {
+      const taskList = await MockStore.getTasks(user.role);
+      const s = await MockStore.getStats(user.id, user.role);
+      const sett = await MockStore.getSettlements();
+      const aff = await MockStore.getAffiliates();
+      const ov = await MockStore.getAdminOverviewStats();
+
+      setTasks(taskList);
+      setStats(s);
+      setSettlements(sett);
+      setAffiliates(aff);
+      setOverviewData(ov);
+
+      // 获取真实数据
+      await fetchRealTotalStats();
+      await fetchAnomalies();
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setTimeout(() => setRefreshing(false), 500);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       const taskList = await MockStore.getTasks(user.role);
@@ -61,12 +121,16 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       const sett = await MockStore.getSettlements();
       const aff = await MockStore.getAffiliates();
       const ov = await MockStore.getAdminOverviewStats();
-      
+
       setTasks(taskList);
       setStats(s);
       setSettlements(sett);
       setAffiliates(aff);
       setOverviewData(ov);
+
+      // 获取真实数据
+      fetchRealTotalStats();
+      fetchAnomalies();
     };
     fetchData();
   }, [user]);
@@ -286,14 +350,17 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">${overviewData.pendingPayout.toLocaleString()}</p>
                 <div className="text-xs text-slate-500 mt-2">{t('admin.nextSettlementDate', { date: 'End of Month' })}</div>
             </div>
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors">
+            <div
+                onClick={() => setShowAnomaliesModal(true)}
+                className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors cursor-pointer hover:border-orange-500 dark:hover:border-orange-500"
+            >
                 <div className="flex justify-between items-start mb-4">
                     <div className="p-2 bg-orange-500/10 rounded-lg"><AlertTriangle className="text-orange-600 dark:text-orange-400" size={24} /></div>
                     <span className="text-xs font-mono text-orange-600 dark:text-orange-400 bg-orange-500/10 px-2 py-1 rounded">{t('common.actionNeeded')}</span>
                 </div>
                 <h3 className="text-slate-500 dark:text-slate-400 text-sm font-medium">{t('admin.flaggedActivities')}</h3>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{overviewData.flaggedCount}</p>
-                <div className="text-xs text-slate-500 mt-2">{t('admin.potentialBot')}</div>
+                <button className="text-xs text-indigo-600 dark:text-indigo-400 mt-2 hover:underline">查看详情 →</button>
             </div>
         </div>
 
@@ -846,9 +913,20 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('common.adminCenter')}</h1>
           <p className="text-slate-500 dark:text-slate-400">Manage tasks, monitor traffic quality, and settle payments.</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">System Operational</span>
+        <div className="flex items-center gap-3">
+          {/* 全局刷新按钮 */}
+          <button
+            onClick={handleRefreshAll}
+            disabled={refreshing}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            title="刷新所有数据"
+          >
+            <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+          </button>
+          <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">System Operational</span>
+          </div>
         </div>
       </div>
 
@@ -860,6 +938,71 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         {activeTab === 'AFFILIATES' && renderAffiliates()}
         {activeTab === 'SETTLEMENTS' && renderSettlements()}
       </div>
+
+      {/* 异常预警详情模态框 */}
+      {showAnomaliesModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAnomaliesModal(false)}>
+            <div className="bg-white dark:bg-slate-900 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">异常点击预警详情</h2>
+                    <button onClick={() => setShowAnomaliesModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                        <X size={20} className="text-slate-500" />
+                    </button>
+                </div>
+                <div className="p-6 overflow-y-auto max-h-[calc(80vh-8rem)]">
+                    {anomalies.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                            <CheckCircle size={48} className="mx-auto mb-4 text-emerald-500" />
+                            <p>暂无异常预警</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {anomalies.map((anomaly, idx) => (
+                                <div key={idx} className={`p-4 rounded-lg border ${anomaly.severity === 'high' ? 'border-red-500/30 bg-red-500/5' : 'border-orange-500/30 bg-orange-500/5'}`}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <AlertTriangle size={18} className={anomaly.severity === 'high' ? 'text-red-500' : 'text-orange-500'} />
+                                            <span className={`text-sm font-bold uppercase ${anomaly.severity === 'high' ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                                                {anomaly.severity === 'high' ? '高危' : '中危'}
+                                            </span>
+                                        </div>
+                                        <span className="text-xs text-slate-500">{new Date(anomaly.detectedAt).toLocaleString()}</span>
+                                    </div>
+                                    <p className="text-slate-900 dark:text-white font-medium mb-1">{anomaly.details}</p>
+                                    <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                                        {anomaly.ipAddress && (
+                                            <div>
+                                                <span className="text-slate-500">IP 地址:</span>
+                                                <span className="ml-2 font-mono text-slate-900 dark:text-white">{anomaly.ipAddress}</span>
+                                            </div>
+                                        )}
+                                        {anomaly.linkCode && (
+                                            <div>
+                                                <span className="text-slate-500">短链接:</span>
+                                                <span className="ml-2 font-mono text-slate-900 dark:text-white">{anomaly.linkCode}</span>
+                                            </div>
+                                        )}
+                                        {anomaly.clickCount && (
+                                            <div>
+                                                <span className="text-slate-500">点击次数:</span>
+                                                <span className="ml-2 font-bold text-slate-900 dark:text-white">{anomaly.clickCount}</span>
+                                            </div>
+                                        )}
+                                        {anomaly.uniqueLinks && (
+                                            <div>
+                                                <span className="text-slate-500">不同链接数:</span>
+                                                <span className="ml-2 font-bold text-slate-900 dark:text-white">{anomaly.uniqueLinks}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
