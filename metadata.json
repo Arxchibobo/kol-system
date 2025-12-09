@@ -1,0 +1,5 @@
+{
+  "name": "MyShell Affiliate Center",
+  "description": "A comprehensive affiliate management system for MyShell, connecting operations (Admin) with influencers (Affiliates) for task tracking, data visualization, and tiered rewards.",
+  "requestFramePermissions": []
+}
