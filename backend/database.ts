@@ -1,37 +1,41 @@
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
+import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
-let db: Database | null = null;
+let db: SqlJsDatabase | null = null;
 
-// Use /tmp for read-write access in Cloud Run
+// 使用 /tmp 目录以获得读写权限 (适用于 Cloud Run)
 const dataDir = os.tmpdir();
 const dbPath = path.join(dataDir, 'tracking.sqlite');
 
-// Ensure dataDir exists (crucial for some environments)
+// 确保数据目录存在 (对某些环境很重要)
 try {
     if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
     }
 } catch (e) {
-    console.error(`Failed to ensure data dir ${dataDir} exists:`, e);
+    console.error(`创建数据目录失败 ${dataDir}:`, e);
 }
 
 export async function initDB() {
     if (db) return db;
 
-    console.log(`[DB] Initializing SQLite at: ${dbPath}`);
+    console.log(`[DB] 初始化 SQLite 数据库: ${dbPath}`);
 
     try {
-        db = await open({
-            filename: dbPath,
-            driver: sqlite3.Database
-        });
+        const SQL = await initSqlJs();
 
-        // 1. Links Table
-        await db.exec(`
+        // 如果数据库文件存在，加载它
+        if (fs.existsSync(dbPath)) {
+            const buffer = fs.readFileSync(dbPath);
+            db = new SQL.Database(buffer);
+        } else {
+            db = new SQL.Database();
+        }
+
+        // 1. 链接表
+        db.run(`
             CREATE TABLE IF NOT EXISTS links (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 code TEXT UNIQUE NOT NULL,
@@ -42,12 +46,12 @@ export async function initDB() {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 click_count INTEGER DEFAULT 0
             );
-            CREATE INDEX IF NOT EXISTS idx_links_code ON links(code);
-            CREATE INDEX IF NOT EXISTS idx_links_creator ON links(creator_user_id);
         `);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_links_code ON links(code);`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_links_creator ON links(creator_user_id);`);
 
-        // 2. Clicks Table
-        await db.exec(`
+        // 2. 点击表
+        db.run(`
             CREATE TABLE IF NOT EXISTS clicks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 link_id INTEGER NOT NULL,
@@ -57,14 +61,26 @@ export async function initDB() {
                 clicked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(link_id) REFERENCES links(id)
             );
-            CREATE INDEX IF NOT EXISTS idx_clicks_link_id ON clicks(link_id);
         `);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_clicks_link_id ON clicks(link_id);`);
 
-        console.log('✅ SQLite Tables Ready');
+        // 保存数据库到文件
+        saveDB();
+
+        console.log('✅ SQLite 数据表已就绪');
         return db;
     } catch (err) {
-        console.error('❌ DB Init Failed:', err);
+        console.error('❌ 数据库初始化失败:', err);
         throw err;
+    }
+}
+
+// 保存数据库到文件
+function saveDB() {
+    if (db) {
+        const data = db.export();
+        const buffer = Buffer.from(data);
+        fs.writeFileSync(dbPath, buffer);
     }
 }
 
@@ -75,29 +91,48 @@ export async function createLink(data: {
     target_url: string;
     code: string;
 }) {
-    const db = await initDB();
-    await db.run(
+    const database = await initDB();
+    database.run(
         `INSERT INTO links (code, creator_user_id, task_id, campaign_id, target_url) VALUES (?, ?, ?, ?, ?)`,
         [data.code, data.creator_user_id, data.task_id, data.campaign_id, data.target_url]
     );
+    saveDB();
     return getLinkByCode(data.code);
 }
 
 export async function getLinkByCode(code: string) {
-    const db = await initDB();
-    return db.get(`SELECT * FROM links WHERE code = ?`, [code]);
+    const database = await initDB();
+    const result = database.exec(`SELECT * FROM links WHERE code = ?`, [code]);
+    if (result.length === 0 || result[0].values.length === 0) {
+        return null;
+    }
+
+    const columns = result[0].columns;
+    const values = result[0].values[0];
+    const row: any = {};
+    columns.forEach((col, idx) => {
+        row[col] = values[idx];
+    });
+    return row;
 }
 
 export async function logClick(linkId: number, ip: string, ua: string, referrer: string) {
-    const db = await initDB();
-    await db.run(`INSERT INTO clicks (link_id, ip_address, user_agent, referrer) VALUES (?, ?, ?, ?)`, [linkId, ip, ua, referrer]);
-    await db.run(`UPDATE links SET click_count = click_count + 1 WHERE id = ?`, [linkId]);
+    const database = await initDB();
+    database.run(`INSERT INTO clicks (link_id, ip_address, user_agent, referrer) VALUES (?, ?, ?, ?)`, [linkId, ip, ua, referrer]);
+    database.run(`UPDATE links SET click_count = click_count + 1 WHERE id = ?`, [linkId]);
+    saveDB();
 }
 
 export async function getStatsByCreator(creatorId: string) {
-    const db = await initDB();
-    const result = await db.get(`SELECT SUM(click_count) as total_clicks FROM links WHERE creator_user_id = ?`, [creatorId]);
+    const database = await initDB();
+    const result = database.exec(`SELECT SUM(click_count) as total_clicks FROM links WHERE creator_user_id = ?`, [creatorId]);
+
+    if (result.length === 0 || result[0].values.length === 0) {
+        return { totalClicks: 0 };
+    }
+
+    const totalClicks = result[0].values[0][0] || 0;
     return {
-        totalClicks: result?.total_clicks || 0
+        totalClicks: totalClicks
     };
 }

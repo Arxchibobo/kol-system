@@ -95,7 +95,7 @@ app.post('/api/tracking-links', async (req, res) => {
 
         let code = generateCode();
         let retries = 0;
-        
+
         // Retry logic for collision handling
         while (retries < 5) {
             try {
@@ -106,7 +106,7 @@ app.post('/api/tracking-links', async (req, res) => {
                     target_url,
                     code
                 });
-                break; 
+                break;
             } catch (e: any) {
                 if (e.message && e.message.includes('UNIQUE constraint failed')) {
                     console.warn(`Collision detected for code ${code}, retrying...`);
@@ -160,10 +160,10 @@ const handleRedirect = async (req: express.Request, res: express.Response, next:
 
     // 1. Strict Filter: Ignore specific system paths, assets, and error prefixes
     const ignoredPrefixes = ['health', 'api', 'assets', 'favicon', 'robots', 'manifest', 'index', 'err-', 'r'];
-    
+
     if (
         !code ||
-        code.includes('.') || 
+        code.includes('.') ||
         ignoredPrefixes.some(prefix => code.startsWith(prefix))
     ) {
         return next();
@@ -177,8 +177,8 @@ const handleRedirect = async (req: express.Request, res: express.Response, next:
             const ip = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '';
             const ua = req.get('User-Agent') || '';
             const referrer = req.get('Referrer') || '';
-            
-            // 3. Log Click Asynchronously
+
+            // 3. Log Click (异步执行，不阻塞重定向)
             logClick(link.id, ip, ua, referrer).catch(err => {
                 console.error(`[Click Log Error] Link ${code}:`, err);
             });
@@ -195,7 +195,7 @@ const handleRedirect = async (req: express.Request, res: express.Response, next:
             console.log(`[Redirect] ${code} -> ${finalUrl} (IP: ${ip})`);
             return res.redirect(302, finalUrl);
         }
-        
+
         next();
     } catch (error) {
         console.error('Redirect Logic Error:', error);

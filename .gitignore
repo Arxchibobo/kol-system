@@ -10,7 +10,12 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-server
 *.local
+
+# Database
+*.sqlite
+*.db
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +27,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code
+.claude/
+
+# Screenshots and test files
+CCimages/
+
+# Local test files
+本地测试指南.md
+启动服务器.bat

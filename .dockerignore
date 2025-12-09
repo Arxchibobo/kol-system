@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log
+dist
+dist-server
+.git
+.gitignore
+.env
+.env.local
+*.sqlite
+*.db
+.claude
+CCimages
+本地测试指南.md
+启动服务器.bat
+TEST_REPORT.md
+USER_TEST_CHECKLIST.md
