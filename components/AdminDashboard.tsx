@@ -49,6 +49,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   // 全局刷新状态
   const [refreshing, setRefreshing] = useState(false);
 
+  // 标签分类系统
+  const AVAILABLE_TAGS = ['AI博主', '时尚博主', '生活博主', '科技博主', '游戏博主', '美食博主', '旅游博主', '其他'];
+  const [selectedTag, setSelectedTag] = useState<string>('全部');
+
   // Manual Add KOL State
   const [showAddKolModal, setShowAddKolModal] = useState(false);
   const [newKol, setNewKol] = useState<Partial<User>>({
@@ -56,6 +60,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     email: '',
     tier: Tier.BRONZE,
     followerCount: 0,
+    tags: [],
     socialLinks: { twitter: '', youtube: '', instagram: '', tiktok: '' }
   });
 
@@ -273,7 +278,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
   const handleAddKol = async () => {
     if (!newKol.name || !newKol.email) return;
-    
+
     const userToAdd: User = {
         id: `manual-${Date.now()}`,
         name: newKol.name,
@@ -287,10 +292,28 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         validClicks: 0,
         followerCount: newKol.followerCount,
         socialLinks: newKol.socialLinks,
-        walletAddress: ''
+        walletAddress: '',
+        tags: newKol.tags || []
     };
 
+    // 添加达人到 MockStore
     await MockStore.addAffiliate(userToAdd);
+
+    // 保存标签到数据库
+    if (newKol.tags && newKol.tags.length > 0) {
+        await fetch(`/api/user/profile/${userToAdd.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                followerCount: newKol.followerCount,
+                tags: newKol.tags,
+                name: newKol.name,
+                email: newKol.email,
+                avatar: userToAdd.avatar
+            })
+        });
+    }
+
     const updatedList = await MockStore.getAffiliates();
     const ov = await MockStore.getAdminOverviewStats();
     setAffiliates(updatedList);
@@ -298,13 +321,14 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setShowAddKolModal(false);
     setSyncMessage(t('admin.addSuccess'));
     setTimeout(() => setSyncMessage(null), 3000);
-    
+
     // Reset form
     setNewKol({
         name: '',
         email: '',
         tier: Tier.BRONZE,
         followerCount: 0,
+        tags: [],
         socialLinks: { twitter: '', youtube: '', instagram: '', tiktok: '' }
     });
   };
@@ -576,10 +600,19 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   );
 
   const renderAffiliates = () => {
-    const filteredAffiliates = affiliates.filter(a => 
-        a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        a.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // 根据搜索和标签筛选达人
+    const filteredAffiliates = affiliates.filter(a => {
+        const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                             a.email.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesTag = selectedTag === '全部' || (a.tags && a.tags.includes(selectedTag));
+        return matchesSearch && matchesTag;
+    });
+
+    // 统计每个标签的达人数量
+    const tagCounts = AVAILABLE_TAGS.reduce((acc, tag) => {
+        acc[tag] = affiliates.filter(a => a.tags && a.tags.includes(tag)).length;
+        return acc;
+    }, {} as Record<string, number>);
 
     return (
         <div className="space-y-6">
@@ -638,6 +671,33 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                 </div>
             )}
 
+            {/* 标签筛选按钮组 */}
+            <div className="flex flex-wrap items-center gap-2">
+                <button
+                    onClick={() => setSelectedTag('全部')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedTag === '全部'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:border-indigo-500'
+                    }`}
+                >
+                    全部 ({affiliates.length})
+                </button>
+                {AVAILABLE_TAGS.map((tag) => (
+                    <button
+                        key={tag}
+                        onClick={() => setSelectedTag(tag)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            selectedTag === tag
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:border-indigo-500'
+                        }`}
+                    >
+                        {tag} ({tagCounts[tag] || 0})
+                    </button>
+                ))}
+            </div>
+
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden min-h-[200px] transition-colors">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
@@ -665,6 +725,16 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                 <div>
                                                     <div className="font-medium text-slate-900 dark:text-white">{aff.name}</div>
                                                     <div className="text-xs text-slate-500">{aff.email}</div>
+                                                    {/* 标签徽章 */}
+                                                    {aff.tags && aff.tags.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {aff.tags.map((tag, idx) => (
+                                                                <span key={idx} className="px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded text-[10px] font-medium">
+                                                                    {tag}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                     <div className="flex gap-2 mt-1">
                                                         {aff.socialLinks?.twitter && <a href={aff.socialLinks.twitter} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-slate-400 hover:text-blue-500"><Twitter size={12}/></a>}
                                                         {aff.socialLinks?.youtube && <a href={aff.socialLinks.youtube} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-slate-400 hover:text-red-500"><Youtube size={12}/></a>}
@@ -742,7 +812,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                                     <Award size={16} className="text-indigo-500"/>
                                                                     <span>Edit Tier Level</span>
                                                                 </div>
-                                                                <select 
+                                                                <select
                                                                     value={aff.tier}
                                                                     onChange={(e) => handleUpdateTier(aff, e.target.value as Tier)}
                                                                     className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
@@ -751,6 +821,78 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                                     <option value={Tier.SILVER}>{t('admin.tierSilver')}</option>
                                                                     <option value={Tier.GOLD}>{t('admin.tierGold')}</option>
                                                                 </select>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 标签编辑区域 */}
+                                                        <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                            <h5 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">编辑标签</h5>
+                                                            {/* 当前标签 */}
+                                                            <div className="mb-3">
+                                                                <p className="text-xs text-slate-500 mb-2">当前标签:</p>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {aff.tags && aff.tags.length > 0 ? (
+                                                                        aff.tags.map((tag, idx) => (
+                                                                            <span
+                                                                                key={idx}
+                                                                                className="px-3 py-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-sm font-medium flex items-center gap-2 group hover:bg-red-500/10 transition-colors"
+                                                                            >
+                                                                                {tag}
+                                                                                <button
+                                                                                    onClick={async () => {
+                                                                                        const newTags = aff.tags?.filter(t => t !== tag) || [];
+                                                                                        await fetch(`/api/user/profile/${aff.id}`, {
+                                                                                            method: 'PUT',
+                                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                                            body: JSON.stringify({ tags: newTags })
+                                                                                        });
+                                                                                        const updatedList = await MockStore.getAffiliates();
+                                                                                        setAffiliates(updatedList);
+                                                                                    }}
+                                                                                    className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                                                                >
+                                                                                    <X size={14} />
+                                                                                </button>
+                                                                            </span>
+                                                                        ))
+                                                                    ) : (
+                                                                        <span className="text-sm text-slate-400">暂无标签</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {/* 添加标签 */}
+                                                            <div>
+                                                                <p className="text-xs text-slate-500 mb-2">添加标签:</p>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {AVAILABLE_TAGS.map((tag) => {
+                                                                        const hasTag = aff.tags && aff.tags.includes(tag);
+                                                                        return (
+                                                                            <button
+                                                                                key={tag}
+                                                                                onClick={async () => {
+                                                                                    if (!hasTag) {
+                                                                                        const newTags = [...(aff.tags || []), tag];
+                                                                                        await fetch(`/api/user/profile/${aff.id}`, {
+                                                                                            method: 'PUT',
+                                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                                            body: JSON.stringify({ tags: newTags })
+                                                                                        });
+                                                                                        const updatedList = await MockStore.getAffiliates();
+                                                                                        setAffiliates(updatedList);
+                                                                                    }
+                                                                                }}
+                                                                                disabled={hasTag}
+                                                                                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                                                                                    hasTag
+                                                                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                                                                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer'
+                                                                                }`}
+                                                                            >
+                                                                                {hasTag ? '✓ ' : '+ '}{tag}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -885,15 +1027,51 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{t('admin.labelTiktok')}</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                     value={newKol.socialLinks?.tiktok}
                                     onChange={e => setNewKol({...newKol, socialLinks: {...newKol.socialLinks, tiktok: e.target.value}})}
                                     placeholder="https://tiktok.com/@..."
                                 />
                             </div>
-                            
+
+                            {/* 标签选择 */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">标签分类</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {AVAILABLE_TAGS.map((tag) => {
+                                        const isSelected = newKol.tags?.includes(tag);
+                                        return (
+                                            <button
+                                                key={tag}
+                                                type="button"
+                                                onClick={() => {
+                                                    const currentTags = newKol.tags || [];
+                                                    if (isSelected) {
+                                                        setNewKol({...newKol, tags: currentTags.filter(t => t !== tag)});
+                                                    } else {
+                                                        setNewKol({...newKol, tags: [...currentTags, tag]});
+                                                    }
+                                                }}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                                    isSelected
+                                                        ? 'bg-indigo-600 text-white'
+                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                                }`}
+                                            >
+                                                {isSelected ? '✓ ' : ''}{tag}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {newKol.tags && newKol.tags.length > 0 && (
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        已选择 {newKol.tags.length} 个标签
+                                    </p>
+                                )}
+                            </div>
+
                             <div className="flex justify-end gap-3 mt-6">
                                 <button onClick={() => setShowAddKolModal(false)} className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">{t('common.cancel')}</button>
                                 <button onClick={handleAddKol} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">{t('common.add')}</button>

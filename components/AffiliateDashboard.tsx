@@ -87,6 +87,49 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     setTimeout(() => setRefreshing(false), 500);
   };
 
+  // 个人资料编辑状态
+  const [profileData, setProfileData] = useState({
+    followerCount: 0,
+    walletAddress: '',
+    twitter: ''
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // 加载用户资料时初始化
+  useEffect(() => {
+    setProfileData({
+      followerCount: dashboardUser.followerCount || 0,
+      walletAddress: dashboardUser.walletAddress || '',
+      twitter: dashboardUser.socialLinks?.twitter || ''
+    });
+  }, [dashboardUser]);
+
+  // 保存个人资料
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      await fetch(`/api/user/profile/${dashboardUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          followerCount: profileData.followerCount,
+          name: dashboardUser.name,
+          email: dashboardUser.email,
+          avatar: dashboardUser.avatar
+        })
+      });
+
+      // 重新加载数据
+      await loadData();
+      alert('个人资料已保存');
+    } catch (error) {
+      console.error('保存失败:', error);
+      alert('保存失败,请重试');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
 
   const renderNav = () => (
     <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit mb-8 transition-colors">
@@ -366,15 +409,54 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                       <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t('affiliate.displayName')}</label>
                       <input type="text" value={dashboardUser.name} readOnly className="w-full bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-500 cursor-not-allowed" />
                   </div>
+
+                  {/* 粉丝量输入框 - 可编辑 */}
+                  <div>
+                      <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                          粉丝量
+                          <span className="ml-2 text-xs text-slate-400">(可手动编辑)</span>
+                      </label>
+                      <input
+                          type="number"
+                          value={profileData.followerCount}
+                          onChange={(e) => setProfileData({...profileData, followerCount: parseInt(e.target.value) || 0})}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                          placeholder="请输入粉丝数量"
+                      />
+                  </div>
+
                   <div>
                       <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t('affiliate.walletAddress')}</label>
-                      <input type="text" defaultValue={dashboardUser.walletAddress} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500" />
+                      <input
+                          type="text"
+                          value={profileData.walletAddress}
+                          onChange={(e) => setProfileData({...profileData, walletAddress: e.target.value})}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      />
                   </div>
                   <div>
                       <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t('affiliate.twitterUrl')}</label>
-                      <input type="text" defaultValue={dashboardUser.socialLinks?.twitter} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500" />
+                      <input
+                          type="text"
+                          value={profileData.twitter}
+                          onChange={(e) => setProfileData({...profileData, twitter: e.target.value})}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                      />
                   </div>
-                  <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium">{t('affiliate.saveChanges')}</button>
+                  <button
+                      onClick={handleSaveProfile}
+                      disabled={savingProfile}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                      {savingProfile ? (
+                          <>
+                              <RefreshCw size={16} className="animate-spin" />
+                              保存中...
+                          </>
+                      ) : (
+                          t('affiliate.saveChanges')
+                      )}
+                  </button>
               </div>
           </div>
       )}
