@@ -39,6 +39,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
+  // 达人实时统计数据 (从数据库获取)
+  const [creatorStats, setCreatorStats] = useState<Record<string, any>>({});
+
   // Manual Add KOL State
   const [showAddKolModal, setShowAddKolModal] = useState(false);
   const [newKol, setNewKol] = useState<Partial<User>>({
@@ -172,14 +175,29 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     }
   };
 
-  const toggleRow = (id: string) => {
+  const toggleRow = async (id: string) => {
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(id)) {
         newExpanded.delete(id);
     } else {
         newExpanded.add(id);
+        // 当展开时,获取该达人的实时统计数据
+        await fetchCreatorStats(id);
     }
     setExpandedRows(newExpanded);
+  };
+
+  // 获取达人的实时统计数据
+  const fetchCreatorStats = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/admin/creator-stats/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setCreatorStats(prev => ({ ...prev, [userId]: data }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch creator stats:', error);
+    }
   };
 
   const handleUpdateTier = async (affiliate: User, newTier: Tier) => {
@@ -675,15 +693,25 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                         <div className="space-y-2">
                                                             <div className="flex justify-between">
                                                                 <span className="text-sm text-slate-500 dark:text-slate-400">Campaigns Joined</span>
-                                                                <span className="text-sm font-bold text-slate-900 dark:text-white">0</span>
+                                                                <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                                                    {creatorStats[aff.id]?.campaignsJoined ?? '-'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className="text-sm text-slate-500 dark:text-slate-400">Total Clicks</span>
+                                                                <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                                                    {creatorStats[aff.id]?.totalClicks?.toLocaleString() ?? '-'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className="text-sm text-slate-500 dark:text-slate-400">Links Created</span>
+                                                                <span className="text-sm font-bold text-slate-600 dark:text-slate-400">
+                                                                    {creatorStats[aff.id]?.linksCreated ?? '-'}
+                                                                </span>
                                                             </div>
                                                             <div className="flex justify-between">
                                                                 <span className="text-sm text-slate-500 dark:text-slate-400">Total Payouts</span>
                                                                 <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${(aff.totalEarnings || 0).toLocaleString()}</span>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                                <span className="text-sm text-slate-500 dark:text-slate-400">Quality Score</span>
-                                                                <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">-</span>
                                                             </div>
                                                         </div>
                                                     </div>

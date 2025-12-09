@@ -136,3 +136,46 @@ export async function getStatsByCreator(creatorId: string) {
         totalClicks: totalClicks
     };
 }
+
+/**
+ * 获取达人的详细统计信息 (用于运营侧显示)
+ * @param creatorId - 达人用户 ID
+ * @returns 包含 campaign 数量、点击数、短链接数等信息
+ */
+export async function getCreatorDetailedStats(creatorId: string) {
+    const database = await initDB();
+
+    // 1. 获取该达人参与的 campaign 数量 (通过 campaign_id 去重)
+    const campaignResult = database.exec(
+        `SELECT COUNT(DISTINCT campaign_id) as campaign_count FROM links WHERE creator_user_id = ?`,
+        [creatorId]
+    );
+
+    // 2. 获取总点击数
+    const clickResult = database.exec(
+        `SELECT SUM(click_count) as total_clicks FROM links WHERE creator_user_id = ?`,
+        [creatorId]
+    );
+
+    // 3. 获取短链接数量
+    const linkResult = database.exec(
+        `SELECT COUNT(*) as link_count FROM links WHERE creator_user_id = ?`,
+        [creatorId]
+    );
+
+    // 4. 获取最近点击时间
+    const recentClickResult = database.exec(
+        `SELECT MAX(clicks.clicked_at) as last_click
+         FROM clicks
+         JOIN links ON clicks.link_id = links.id
+         WHERE links.creator_user_id = ?`,
+        [creatorId]
+    );
+
+    return {
+        campaignsJoined: campaignResult[0]?.values[0]?.[0] || 0,
+        totalClicks: clickResult[0]?.values[0]?.[0] || 0,
+        linksCreated: linkResult[0]?.values[0]?.[0] || 0,
+        lastClickAt: recentClickResult[0]?.values[0]?.[0] || null
+    };
+}

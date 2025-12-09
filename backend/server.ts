@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getCreatorDetailedStats } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -143,6 +143,18 @@ app.get('/api/stats/affiliate/:userId', async (req, res) => {
     } catch (error) {
         console.error('Stats Error:', error);
         res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+});
+
+// 获取达人的详细统计信息 (用于运营侧显示)
+app.get('/api/admin/creator-stats/:userId', async (req, res) => {
+    try {
+        const stats = await getCreatorDetailedStats(req.params.userId);
+        console.log(`[Admin API] Fetched stats for creator ${req.params.userId}:`, stats);
+        res.json(stats);
+    } catch (error) {
+        console.error('Creator Stats Error:', error);
+        res.status(500).json({ error: 'Failed to fetch creator stats' });
     }
 });
 
