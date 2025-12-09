@@ -183,8 +183,17 @@ const handleRedirect = async (req: express.Request, res: express.Response, next:
                 console.error(`[Click Log Error] Link ${code}:`, err);
             });
 
-            console.log(`[Redirect] ${code} -> ${link.target_url} (IP: ${ip})`);
-            return res.redirect(302, link.target_url);
+            // 4. Build tracking URL with parameters (实现"两次跳转"功能)
+            const targetUrl = new URL(link.target_url);
+            targetUrl.searchParams.set('utm_source', 'myshell');
+            targetUrl.searchParams.set('utm_medium', 'affiliate');
+            targetUrl.searchParams.set('aff_id', link.creator_user_id);
+            targetUrl.searchParams.set('task_id', link.task_id);
+            targetUrl.searchParams.set('ref', code);
+
+            const finalUrl = targetUrl.toString();
+            console.log(`[Redirect] ${code} -> ${finalUrl} (IP: ${ip})`);
+            return res.redirect(302, finalUrl);
         }
         
         next();

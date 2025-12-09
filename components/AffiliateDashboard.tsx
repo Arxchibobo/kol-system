@@ -21,6 +21,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const [stats, setStats] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [simulating, setSimulating] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
   
   // Modal State
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);

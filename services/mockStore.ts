@@ -235,21 +235,14 @@ export const MockStore = {
         }
 
     } catch (e: any) {
-        console.error("Link generation failed after retries:", e);
-        // --- FALLBACK STRATEGY (STATELESS) ---
-        // Generates a URL-safe base64 encoded link that will work via App.tsx interception
-        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://myshell.site';
+        console.error("❌ 短链接生成失败:", e);
         
-        // Payload: { "u": "https://...", "t": "task-id" }
-        const payload = JSON.stringify({ u: task.productLink, t: task.id });
-        
-        // Base64 Encode (URL Safe)
-        // 1. Standard Encode
-        let encoded = btoa(payload);
-        // 2. Make URL Safe: + -> -, / -> _, = -> ''
-        encoded = encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        
-        trackingLink = `${origin}/r/${encoded}`;
+        // 不再使用 fallback 长链接，而是抛出错误让用户知道
+        throw new Error(
+            '短链接生成失败。请确保后端服务器正在运行。\n' +
+            '运行命令: npm run dev\n' +
+            '错误详情: ' + (e.message || e)
+        );
     }
 
     const newAT: AffiliateTask = {
