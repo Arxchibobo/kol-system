@@ -97,7 +97,17 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const [profileData, setProfileData] = useState({
     followerCount: 0,
     walletAddress: '',
-    twitter: ''
+    socialLinks: {
+      twitter: '',
+      instagram: '',
+      youtube: '',
+      tiktok: '',
+      linkedin: '',
+      reddit: '',
+      facebook: '',
+      twitch: '',
+      discord: ''
+    }
   });
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -106,7 +116,17 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     setProfileData({
       followerCount: dashboardUser.followerCount || 0,
       walletAddress: dashboardUser.walletAddress || '',
-      twitter: dashboardUser.socialLinks?.twitter || ''
+      socialLinks: {
+        twitter: dashboardUser.socialLinks?.twitter || '',
+        instagram: dashboardUser.socialLinks?.instagram || '',
+        youtube: dashboardUser.socialLinks?.youtube || '',
+        tiktok: dashboardUser.socialLinks?.tiktok || '',
+        linkedin: dashboardUser.socialLinks?.linkedin || '',
+        reddit: dashboardUser.socialLinks?.reddit || '',
+        facebook: dashboardUser.socialLinks?.facebook || '',
+        twitch: dashboardUser.socialLinks?.twitch || '',
+        discord: dashboardUser.socialLinks?.discord || ''
+      }
     });
   }, [dashboardUser]);
 
@@ -119,6 +139,8 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           followerCount: profileData.followerCount,
+          walletAddress: profileData.walletAddress,
+          socialLinks: profileData.socialLinks,
           name: dashboardUser.name,
           email: dashboardUser.email,
           avatar: dashboardUser.avatar
@@ -127,10 +149,10 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
 
       // 重新加载数据
       await loadData();
-      alert('个人资料已保存');
+      alert('Profile saved successfully');
     } catch (error) {
-      console.error('保存失败:', error);
-      alert('保存失败,请重试');
+      console.error('Save failed:', error);
+      alert('Save failed, please try again');
     } finally {
       setSavingProfile(false);
     }
@@ -293,6 +315,18 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
 
   const renderMyTasks = () => (
     <div className="space-y-6">
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('affiliate.myTasks')}</h2>
+            <button
+                onClick={handleRefreshStats}
+                disabled={refreshing}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                title="Refresh Data"
+            >
+                <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+            </button>
+        </div>
+
         {myTasks.length === 0 && (
              <div className="text-center py-20 text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
                 No tasks claimed yet. Go to the Market to find campaigns!
@@ -328,14 +362,24 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                                 <label className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-2 block">{t('affiliate.trackingLink')}</label>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <div className="relative flex-1">
-                                        <input 
-                                            readOnly 
-                                            value={at.uniqueTrackingLink} 
+                                        <input
+                                            readOnly
+                                            value={at.uniqueTrackingLink}
                                             className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-indigo-600 dark:text-indigo-400 text-sm font-mono w-full focus:outline-none"
                                         />
                                     </div>
                                     <div className="flex gap-2">
-                                        <button 
+                                        <a
+                                            href={at.uniqueTrackingLink}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors flex items-center gap-2 text-sm whitespace-nowrap"
+                                            title="Open Link"
+                                        >
+                                            <ExternalLink size={16} />
+                                            <span className="hidden sm:inline">Open</span>
+                                        </a>
+                                        <button
                                             onClick={() => copyToClipboard(at.uniqueTrackingLink)}
                                             className="px-3 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors flex items-center gap-2 text-sm whitespace-nowrap"
                                             title="Copy Link"
@@ -408,61 +452,194 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       {activeTab === 'MARKET' && renderMarket()}
       {activeTab === 'MY_TASKS' && renderMyTasks()}
       {activeTab === 'PROFILE' && (
-          <div className="max-w-2xl">
+          <div className="max-w-4xl">
               <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">{t('affiliate.profileSettings')}</h2>
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 space-y-6 transition-colors">
-                  <div>
-                      <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t('affiliate.displayName')}</label>
-                      <input type="text" value={dashboardUser.name} readOnly className="w-full bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-500 cursor-not-allowed" />
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 space-y-8 transition-colors">
+                  {/* Basic Information Section */}
+                  <div className="space-y-6">
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">Basic Information</h3>
+
+                      <div>
+                          <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t('affiliate.displayName')}</label>
+                          <input type="text" value={dashboardUser.name} readOnly className="w-full bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-500 cursor-not-allowed" />
+                      </div>
+
+                      <div>
+                          <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                              Follower Count
+                              <span className="ml-2 text-xs text-slate-400">(Editable)</span>
+                          </label>
+                          <input
+                              type="number"
+                              value={profileData.followerCount}
+                              onChange={(e) => setProfileData({...profileData, followerCount: parseInt(e.target.value) || 0})}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                              placeholder="Enter follower count"
+                          />
+                      </div>
+
+                      <div>
+                          <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t('affiliate.walletAddress')}</label>
+                          <input
+                              type="text"
+                              value={profileData.walletAddress}
+                              onChange={(e) => setProfileData({...profileData, walletAddress: e.target.value})}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                              placeholder="Enter USDT wallet address"
+                          />
+                      </div>
                   </div>
 
-                  {/* 粉丝量输入框 - 可编辑 */}
-                  <div>
-                      <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
-                          粉丝量
-                          <span className="ml-2 text-xs text-slate-400">(可手动编辑)</span>
-                      </label>
-                      <input
-                          type="number"
-                          value={profileData.followerCount}
-                          onChange={(e) => setProfileData({...profileData, followerCount: parseInt(e.target.value) || 0})}
-                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                          placeholder="请输入粉丝数量"
-                      />
+                  {/* Social Media Links Section */}
+                  <div className="space-y-6">
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">Social Media Links</h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Twitter/X */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  Twitter / X URL
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.twitter}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, twitter: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="https://twitter.com/username"
+                              />
+                          </div>
+
+                          {/* Instagram */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  Instagram URL
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.instagram}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, instagram: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="https://instagram.com/username"
+                              />
+                          </div>
+
+                          {/* YouTube */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  YouTube URL
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.youtube}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, youtube: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="https://youtube.com/@username"
+                              />
+                          </div>
+
+                          {/* TikTok */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  TikTok URL
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.tiktok}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, tiktok: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="https://tiktok.com/@username"
+                              />
+                          </div>
+
+                          {/* LinkedIn */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  LinkedIn URL
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.linkedin}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, linkedin: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="https://linkedin.com/in/username"
+                              />
+                          </div>
+
+                          {/* Reddit */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  Reddit URL
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.reddit}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, reddit: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="https://reddit.com/user/username"
+                              />
+                          </div>
+
+                          {/* Facebook */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  Facebook URL
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.facebook}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, facebook: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="https://facebook.com/username"
+                              />
+                          </div>
+
+                          {/* Twitch */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  Twitch URL
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.twitch}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, twitch: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="https://twitch.tv/username"
+                              />
+                          </div>
+
+                          {/* Discord */}
+                          <div>
+                              <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                  Discord Username
+                              </label>
+                              <input
+                                  type="text"
+                                  value={profileData.socialLinks.discord}
+                                  onChange={(e) => setProfileData({...profileData, socialLinks: {...profileData.socialLinks, discord: e.target.value}})}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  placeholder="username#1234"
+                              />
+                          </div>
+                      </div>
                   </div>
 
-                  <div>
-                      <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t('affiliate.walletAddress')}</label>
-                      <input
-                          type="text"
-                          value={profileData.walletAddress}
-                          onChange={(e) => setProfileData({...profileData, walletAddress: e.target.value})}
-                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                      />
+                  {/* Save Button */}
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                      <button
+                          onClick={handleSaveProfile}
+                          disabled={savingProfile}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                          {savingProfile ? (
+                              <>
+                                  <RefreshCw size={16} className="animate-spin" />
+                                  Saving...
+                              </>
+                          ) : (
+                              t('affiliate.saveChanges')
+                          )}
+                      </button>
                   </div>
-                  <div>
-                      <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">{t('affiliate.twitterUrl')}</label>
-                      <input
-                          type="text"
-                          value={profileData.twitter}
-                          onChange={(e) => setProfileData({...profileData, twitter: e.target.value})}
-                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                      />
-                  </div>
-                  <button
-                      onClick={handleSaveProfile}
-                      disabled={savingProfile}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                      {savingProfile ? (
-                          <>
-                              <RefreshCw size={16} className="animate-spin" />
-                              保存中...
-                          </>
-                      ) : (
-                          t('affiliate.saveChanges')
-                      )}
-                  </button>
               </div>
           </div>
       )}

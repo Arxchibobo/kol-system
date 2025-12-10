@@ -38,6 +38,11 @@ export interface User {
     youtube?: string;
     tiktok?: string;
     instagram?: string;
+    linkedin?: string;
+    reddit?: string;
+    facebook?: string;
+    twitch?: string;
+    discord?: string;
   };
   followerCount?: number;
   walletAddress?: string; // USDT
