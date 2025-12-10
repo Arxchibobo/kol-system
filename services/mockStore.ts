@@ -138,13 +138,17 @@ export const MockStore = {
                 }
             }
 
-            // 2. 获取用户资料数据（tags, followerCount 等）
+            // 2. 获取用户资料数据（所有字段）
             const profileRes = await fetch(`/api/user/profile/${foundAffiliate.id}`);
             if (profileRes.ok) {
                 const profile = await profileRes.json();
-                // 合并数据库中的字段
+                // 合并数据库中的所有字段，确保完整的数据同步
                 foundAffiliate.followerCount = profile.follower_count || foundAffiliate.followerCount || 0;
-                foundAffiliate.tags = profile.tags ? JSON.parse(profile.tags) : (foundAffiliate.tags || []);
+                foundAffiliate.tags = profile.tags || (foundAffiliate.tags || []);
+                foundAffiliate.tier = profile.tier || foundAffiliate.tier;
+                foundAffiliate.walletAddress = profile.wallet_address || foundAffiliate.walletAddress;
+                foundAffiliate.totalEarnings = profile.total_earnings || foundAffiliate.totalEarnings || 0;
+                foundAffiliate.pendingEarnings = profile.pending_earnings || foundAffiliate.pendingEarnings || 0;
             }
         } catch (e) {
             console.warn("Failed to fetch backend data", e);
@@ -447,11 +451,15 @@ export const MockStore = {
           const response = await fetch(`/api/user/profile/${affiliate.id}`);
           if (response.ok) {
             const profile = await response.json();
-            // 合并数据库中的字段到 affiliate 对象
+            // 合并数据库中的所有字段到 affiliate 对象，确保完整的数据同步
             return {
               ...affiliate,
               followerCount: profile.follower_count || affiliate.followerCount || 0,
-              tags: profile.tags ? JSON.parse(profile.tags) : (affiliate.tags || [])
+              tags: profile.tags || (affiliate.tags || []),
+              tier: profile.tier || affiliate.tier,
+              walletAddress: profile.wallet_address || affiliate.walletAddress,
+              totalEarnings: profile.total_earnings || affiliate.totalEarnings || 0,
+              pendingEarnings: profile.pending_earnings || affiliate.pendingEarnings || 0
             };
           }
         } catch (error) {

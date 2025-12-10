@@ -41,6 +41,7 @@ export interface User {
   };
   followerCount?: number;
   walletAddress?: string; // USDT
+  tags?: string[]; // 达人标签分类（AI博主、时尚博主等）
 }
 
 export interface Task {

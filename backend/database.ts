@@ -64,7 +64,7 @@ export async function initDB() {
         `);
         db.run(`CREATE INDEX IF NOT EXISTS idx_clicks_link_id ON clicks(link_id);`);
 
-        // 3. 用户资料表 (存储达人的个人信息)
+        // 3. 用户资料表 (存储达人的完整信息)
         db.run(`
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
@@ -73,6 +73,10 @@ export async function initDB() {
                 follower_count INTEGER DEFAULT 0,
                 tags TEXT,
                 avatar TEXT,
+                tier TEXT,
+                wallet_address TEXT,
+                total_earnings REAL DEFAULT 0,
+                pending_earnings REAL DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -290,7 +294,7 @@ export async function detectAnomalies() {
 }
 
 /**
- * 更新用户资料
+ * 更新用户资料（支持所有用户字段）
  */
 export async function updateUserProfile(userId: string, data: {
     followerCount?: number;
@@ -298,6 +302,10 @@ export async function updateUserProfile(userId: string, data: {
     name?: string;
     email?: string;
     avatar?: string;
+    tier?: string;
+    walletAddress?: string;
+    totalEarnings?: number;
+    pendingEarnings?: number;
 }) {
     const database = await initDB();
 
@@ -307,13 +315,25 @@ export async function updateUserProfile(userId: string, data: {
     const tagsJson = data.tags ? JSON.stringify(data.tags) : null;
 
     if (existingUser.length === 0 || existingUser[0].values.length === 0) {
-        // 用户不存在,插入新记录
+        // 用户不存在,插入新记录（包含所有字段）
         database.run(
-            `INSERT INTO users (id, name, email, follower_count, tags, avatar, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-            [userId, data.name || '', data.email || '', data.followerCount || 0, tagsJson, data.avatar || '']
+            `INSERT INTO users (id, name, email, follower_count, tags, avatar, tier, wallet_address, total_earnings, pending_earnings, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [
+                userId,
+                data.name || '',
+                data.email || '',
+                data.followerCount || 0,
+                tagsJson,
+                data.avatar || '',
+                data.tier || 'BRONZE',
+                data.walletAddress || '',
+                data.totalEarnings || 0,
+                data.pendingEarnings || 0
+            ]
         );
     } else {
-        // 用户存在,更新记录
+        // 用户存在,更新记录（支持所有字段）
         const updates: string[] = [];
         const values: any[] = [];
 
@@ -336,6 +356,22 @@ export async function updateUserProfile(userId: string, data: {
         if (data.avatar !== undefined) {
             updates.push('avatar = ?');
             values.push(data.avatar);
+        }
+        if (data.tier !== undefined) {
+            updates.push('tier = ?');
+            values.push(data.tier);
+        }
+        if (data.walletAddress !== undefined) {
+            updates.push('wallet_address = ?');
+            values.push(data.walletAddress);
+        }
+        if (data.totalEarnings !== undefined) {
+            updates.push('total_earnings = ?');
+            values.push(data.totalEarnings);
+        }
+        if (data.pendingEarnings !== undefined) {
+            updates.push('pending_earnings = ?');
+            values.push(data.pendingEarnings);
         }
 
         updates.push('updated_at = CURRENT_TIMESTAMP');
