@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole } from './types';
 import { MockStore } from './services/mockStore';
-import { LogOut, Globe, Moon, Sun, Loader2, ExternalLink, ShieldCheck } from 'lucide-react';
+import { LogOut, Moon, Sun, Loader2, ExternalLink, ShieldCheck } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 
@@ -140,9 +140,6 @@ function AppContent() {
     localStorage.removeItem('myshell_user');
   };
 
-  const toggleLanguage = () => {
-    setLanguage(language === 'en' ? 'zh' : 'en');
-  };
 
   if (loading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-indigo-500">{t('common.loading')}</div>;
 
@@ -183,14 +180,6 @@ function AppContent() {
           >
             {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             <span>{theme === 'dark' ? t('common.darkMode') : t('common.lightMode')}</span>
-          </button>
-
-          <button 
-            onClick={toggleLanguage}
-            className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition-colors w-full px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md"
-          >
-            <Globe size={18} />
-            <span>{language === 'en' ? '中文' : 'English'}</span>
           </button>
 
           <button 

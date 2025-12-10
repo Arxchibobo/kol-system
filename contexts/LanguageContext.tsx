@@ -10,7 +10,7 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('zh'); // Default to Chinese as per request context
+  const [language, setLanguage] = useState<Language>('en'); // 默认使用英文
 
   const t = (path: string, params?: Record<string, string | number>): string => {
     const keys = path.split('.');
