@@ -29,17 +29,23 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const { theme } = useTheme();
 
   const loadData = useCallback(async () => {
-    // 1. Fetch Latest User Data (for accurate stats like Total Clicks)
+    // 1. 获取最新用户数据（包含统计数据和资料数据）
     const refreshedUser = await MockStore.login(initialUser.email);
     if (refreshedUser) {
         setDashboardUser(refreshedUser);
+        // 同步更新 profileData 状态，确保 Profile 页面显示最新数据
+        setProfileData({
+            followerCount: refreshedUser.followerCount || 0,
+            walletAddress: refreshedUser.walletAddress || '',
+            twitter: refreshedUser.socialLinks?.twitter || ''
+        });
     }
 
     // 2. Fetch Tasks and Stats
     const t = await MockStore.getTasks(initialUser.role);
     const mt = await MockStore.getMyTasks(initialUser.id);
     const s = await MockStore.getStats(initialUser.id, initialUser.role);
-    
+
     // Filter out tasks already claimed
     const claimedIds = new Set(mt.map(i => i.taskId));
     setAllTasks(t);

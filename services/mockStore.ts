@@ -127,17 +127,27 @@ export const MockStore = {
     const foundAffiliate = MOCK_AFFILIATES.find(u => u.email === email);
     if (foundAffiliate) {
         try {
-            const res = await fetch(`/api/stats/affiliate/${foundAffiliate.id}`);
-            if (res.ok) {
-                const contentType = res.headers.get("content-type");
+            // 1. 获取统计数据
+            const statsRes = await fetch(`/api/stats/affiliate/${foundAffiliate.id}`);
+            if (statsRes.ok) {
+                const contentType = statsRes.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
-                    const stats = await res.json();
+                    const stats = await statsRes.json();
                     foundAffiliate.totalClicks = stats.totalClicks;
-                    foundAffiliate.validClicks = Math.floor(stats.totalClicks * 0.8); 
+                    foundAffiliate.validClicks = Math.floor(stats.totalClicks * 0.8);
                 }
             }
+
+            // 2. 获取用户资料数据（tags, followerCount 等）
+            const profileRes = await fetch(`/api/user/profile/${foundAffiliate.id}`);
+            if (profileRes.ok) {
+                const profile = await profileRes.json();
+                // 合并数据库中的字段
+                foundAffiliate.followerCount = profile.follower_count || foundAffiliate.followerCount || 0;
+                foundAffiliate.tags = profile.tags ? JSON.parse(profile.tags) : (foundAffiliate.tags || []);
+            }
         } catch (e) {
-            console.warn("Failed to fetch backend stats", e);
+            console.warn("Failed to fetch backend data", e);
         }
         return foundAffiliate;
     }
@@ -429,7 +439,28 @@ export const MockStore = {
   },
 
   getAffiliates: async () => {
-    return MOCK_AFFILIATES;
+    // 从后端获取所有用户的最新资料数据（tags, followerCount 等）
+    // 并合并到 MOCK_AFFILIATES 中
+    const enrichedAffiliates = await Promise.all(
+      MOCK_AFFILIATES.map(async (affiliate) => {
+        try {
+          const response = await fetch(`/api/user/profile/${affiliate.id}`);
+          if (response.ok) {
+            const profile = await response.json();
+            // 合并数据库中的字段到 affiliate 对象
+            return {
+              ...affiliate,
+              followerCount: profile.follower_count || affiliate.followerCount || 0,
+              tags: profile.tags ? JSON.parse(profile.tags) : (affiliate.tags || [])
+            };
+          }
+        } catch (error) {
+          console.warn(`无法获取用户 ${affiliate.id} 的资料:`, error);
+        }
+        return affiliate;
+      })
+    );
+    return enrichedAffiliates;
   },
 
   addAffiliate: async (user: User) => {
