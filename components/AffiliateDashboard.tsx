@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Task, AffiliateTask, Tier, TIER_RATES, TIER_THRESHOLDS } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2 } from 'lucide-react';
+import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
