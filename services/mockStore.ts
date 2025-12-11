@@ -149,6 +149,24 @@ export const MockStore = {
                 foundAffiliate.walletAddress = profile.wallet_address || foundAffiliate.walletAddress;
                 foundAffiliate.totalEarnings = profile.total_earnings || foundAffiliate.totalEarnings || 0;
                 foundAffiliate.pendingEarnings = profile.pending_earnings || foundAffiliate.pendingEarnings || 0;
+
+                // 同步 socialLinks 字段（防止 Profile 页面崩溃）
+                if (profile.social_links) {
+                    foundAffiliate.socialLinks = profile.social_links;
+                } else if (!foundAffiliate.socialLinks) {
+                    // 如果后端和本地都没有 socialLinks，初始化为空对象
+                    foundAffiliate.socialLinks = {
+                        twitter: '',
+                        instagram: '',
+                        youtube: '',
+                        tiktok: '',
+                        linkedin: '',
+                        reddit: '',
+                        facebook: '',
+                        twitch: '',
+                        discord: ''
+                    };
+                }
             }
         } catch (e) {
             console.warn("Failed to fetch backend data", e);

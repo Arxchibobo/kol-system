@@ -186,17 +186,19 @@ app.get('/api/admin/anomalies', async (req, res) => {
 app.put('/api/user/profile/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        const { followerCount, tags, name, email, avatar } = req.body;
+        const { followerCount, tags, name, email, avatar, walletAddress, socialLinks } = req.body;
 
         await updateUserProfile(userId, {
             followerCount,
             tags,
             name,
             email,
-            avatar
+            avatar,
+            walletAddress,
+            socialLinks
         });
 
-        console.log(`[API] Updated profile for user ${userId}`);
+        console.log(`[API] Updated profile for user ${userId}`, socialLinks ? '(包含 socialLinks)' : '');
         res.json({ success: true });
     } catch (error) {
         console.error('Update Profile Error:', error);

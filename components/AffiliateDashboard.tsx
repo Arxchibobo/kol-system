@@ -113,19 +113,32 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
 
   // 加载用户资料时初始化
   useEffect(() => {
+    // 防御性检查：确保 socialLinks 对象存在
+    const safeSocialLinks = dashboardUser.socialLinks || {
+      twitter: '',
+      instagram: '',
+      youtube: '',
+      tiktok: '',
+      linkedin: '',
+      reddit: '',
+      facebook: '',
+      twitch: '',
+      discord: ''
+    };
+
     setProfileData({
       followerCount: dashboardUser.followerCount || 0,
       walletAddress: dashboardUser.walletAddress || '',
       socialLinks: {
-        twitter: dashboardUser.socialLinks?.twitter || '',
-        instagram: dashboardUser.socialLinks?.instagram || '',
-        youtube: dashboardUser.socialLinks?.youtube || '',
-        tiktok: dashboardUser.socialLinks?.tiktok || '',
-        linkedin: dashboardUser.socialLinks?.linkedin || '',
-        reddit: dashboardUser.socialLinks?.reddit || '',
-        facebook: dashboardUser.socialLinks?.facebook || '',
-        twitch: dashboardUser.socialLinks?.twitch || '',
-        discord: dashboardUser.socialLinks?.discord || ''
+        twitter: safeSocialLinks.twitter || '',
+        instagram: safeSocialLinks.instagram || '',
+        youtube: safeSocialLinks.youtube || '',
+        tiktok: safeSocialLinks.tiktok || '',
+        linkedin: safeSocialLinks.linkedin || '',
+        reddit: safeSocialLinks.reddit || '',
+        facebook: safeSocialLinks.facebook || '',
+        twitch: safeSocialLinks.twitch || '',
+        discord: safeSocialLinks.discord || ''
       }
     });
   }, [dashboardUser]);

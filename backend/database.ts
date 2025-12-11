@@ -75,6 +75,7 @@ export async function initDB() {
                 avatar TEXT,
                 tier TEXT,
                 wallet_address TEXT,
+                social_links TEXT,
                 total_earnings REAL DEFAULT 0,
                 pending_earnings REAL DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -304,6 +305,7 @@ export async function updateUserProfile(userId: string, data: {
     avatar?: string;
     tier?: string;
     walletAddress?: string;
+    socialLinks?: any;
     totalEarnings?: number;
     pendingEarnings?: number;
 }) {
@@ -313,12 +315,13 @@ export async function updateUserProfile(userId: string, data: {
     const existingUser = database.exec(`SELECT id FROM users WHERE id = ?`, [userId]);
 
     const tagsJson = data.tags ? JSON.stringify(data.tags) : null;
+    const socialLinksJson = data.socialLinks ? JSON.stringify(data.socialLinks) : null;
 
     if (existingUser.length === 0 || existingUser[0].values.length === 0) {
         // 用户不存在,插入新记录（包含所有字段）
         database.run(
-            `INSERT INTO users (id, name, email, follower_count, tags, avatar, tier, wallet_address, total_earnings, pending_earnings, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            `INSERT INTO users (id, name, email, follower_count, tags, avatar, tier, wallet_address, social_links, total_earnings, pending_earnings, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
             [
                 userId,
                 data.name || '',
@@ -328,6 +331,7 @@ export async function updateUserProfile(userId: string, data: {
                 data.avatar || '',
                 data.tier || 'BRONZE',
                 data.walletAddress || '',
+                socialLinksJson,
                 data.totalEarnings || 0,
                 data.pendingEarnings || 0
             ]
@@ -364,6 +368,10 @@ export async function updateUserProfile(userId: string, data: {
         if (data.walletAddress !== undefined) {
             updates.push('wallet_address = ?');
             values.push(data.walletAddress);
+        }
+        if (data.socialLinks !== undefined) {
+            updates.push('social_links = ?');
+            values.push(socialLinksJson);
         }
         if (data.totalEarnings !== undefined) {
             updates.push('total_earnings = ?');
@@ -412,6 +420,15 @@ export async function getUserProfile(userId: string) {
             row.tags = JSON.parse(row.tags);
         } catch (e) {
             row.tags = [];
+        }
+    }
+
+    // 解析 social_links JSON
+    if (row.social_links) {
+        try {
+            row.social_links = JSON.parse(row.social_links);
+        } catch (e) {
+            row.social_links = null;
         }
     }
 
