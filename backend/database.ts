@@ -435,3 +435,106 @@ export async function getUserProfile(userId: string) {
 
     return row;
 }
+
+// ----------------------------------------------------------------------
+// 删除任务（级联删除所有相关数据）
+// ----------------------------------------------------------------------
+export async function deleteTaskCascade(taskId: string): Promise<{
+    clicksDeleted: number;
+    linksDeleted: number;
+    affiliateTasksDeleted: number;
+    taskDeleted: boolean;
+}> {
+    if (!db) throw new Error("Database not initialized");
+
+    const result = {
+        clicksDeleted: 0,
+        linksDeleted: 0,
+        affiliateTasksDeleted: 0,
+        taskDeleted: false
+    };
+
+    try {
+        console.log(`[DB] 开始级联删除任务: ${taskId}`);
+
+        // 1. 尝试删除追踪链接和点击记录（如果表存在）
+        try {
+            const linkIdsQuery = `SELECT id FROM tracking_links WHERE task_id = ?`;
+            const linkRows = db.exec(linkIdsQuery, [taskId]);
+
+            let linkIds: any[] = [];
+            if (linkRows.length > 0 && linkRows[0].values.length > 0) {
+                linkIds = linkRows[0].values.map(row => row[0]);
+                console.log(`[DB] 找到 ${linkIds.length} 条追踪链接`);
+
+                // 2. 删除这些链接的点击记录
+                if (linkIds.length > 0) {
+                    try {
+                        // 先统计点击数
+                        const clickCountQuery = `SELECT COUNT(*) FROM clicks WHERE link_id IN (${linkIds.map(() => '?').join(',')})`;
+                        const clickCountResult = db.exec(clickCountQuery, linkIds);
+                        if (clickCountResult.length > 0 && clickCountResult[0].values.length > 0) {
+                            result.clicksDeleted = clickCountResult[0].values[0][0] as number;
+                        }
+
+                        // 删除点击记录
+                        const deleteClicksQuery = `DELETE FROM clicks WHERE link_id IN (${linkIds.map(() => '?').join(',')})`;
+                        db.run(deleteClicksQuery, linkIds);
+                        console.log(`[DB] 删除了 ${result.clicksDeleted} 条点击记录`);
+                    } catch (e) {
+                        console.log(`[DB] clicks 表不存在或删除失败，跳过`);
+                    }
+                }
+
+                // 3. 删除追踪链接
+                const deleteLinksQuery = `DELETE FROM tracking_links WHERE task_id = ?`;
+                db.run(deleteLinksQuery, [taskId]);
+                result.linksDeleted = linkIds.length;
+                console.log(`[DB] 删除了 ${result.linksDeleted} 条追踪链接`);
+            } else {
+                console.log(`[DB] 没有找到相关的追踪链接`);
+            }
+        } catch (e: any) {
+            // tracking_links 表不存在，这是正常的（可能还没有创建追踪链接）
+            if (e.message && e.message.includes('no such table')) {
+                console.log(`[DB] tracking_links 表不存在，跳过删除追踪链接`);
+            } else {
+                throw e;
+            }
+        }
+
+        // 4. 尝试删除达人任务记录（如果表存在）
+        try {
+            // 先统计数量
+            const affTaskCountQuery = `SELECT COUNT(*) FROM affiliate_tasks WHERE task_id = ?`;
+            const affTaskCountResult = db.exec(affTaskCountQuery, [taskId]);
+            if (affTaskCountResult.length > 0 && affTaskCountResult[0].values.length > 0) {
+                result.affiliateTasksDeleted = affTaskCountResult[0].values[0][0] as number;
+            }
+
+            // 删除达人任务记录
+            const deleteAffTasksQuery = `DELETE FROM affiliate_tasks WHERE task_id = ?`;
+            db.run(deleteAffTasksQuery, [taskId]);
+            console.log(`[DB] 删除了 ${result.affiliateTasksDeleted} 条达人任务记录`);
+        } catch (e: any) {
+            // affiliate_tasks 表不存在
+            if (e.message && e.message.includes('no such table')) {
+                console.log(`[DB] affiliate_tasks 表不存在，跳过删除达人任务记录`);
+            } else {
+                throw e;
+            }
+        }
+
+        // 5. 删除任务本身（tasks 表应该总是存在）
+        const deleteTaskQuery = `DELETE FROM tasks WHERE id = ?`;
+        db.run(deleteTaskQuery, [taskId]);
+        result.taskDeleted = true;
+        console.log(`[DB] 删除了任务: ${taskId}`);
+
+        console.log(`[DB] 级联删除任务完成:`, result);
+        return result;
+    } catch (error) {
+        console.error('[DB] 级联删除任务失败:', error);
+        throw error;
+    }
+}

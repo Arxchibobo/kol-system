@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Task, TaskStatus, Settlement, Tier, UserRole } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award } from 'lucide-react';
+import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -224,6 +224,56 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     await MockStore.restartTask(taskId);
     const updatedList = await MockStore.getTasks(user.role);
     setTasks([...updatedList]); // Ensure state update with new reference
+  };
+
+  // 删除任务（级联删除所有相关数据）
+  const handleDeleteTask = async (task: Task) => {
+    // 第一层确认
+    const confirmed = window.confirm(
+      `确定要删除任务 "${task.title}" 吗？\n\n` +
+      `此操作将：\n` +
+      `1. 删除任务本身\n` +
+      `2. 删除所有达人的领取记录\n` +
+      `3. 删除所有相关的追踪链接和点击数据\n\n` +
+      `此操作不可撤销！`
+    );
+
+    if (!confirmed) return;
+
+    // 第二层确认：输入任务名称
+    const confirmText = window.prompt(
+      `请输入任务名称 "${task.title}" 以确认删除：`
+    );
+
+    if (confirmText !== task.title) {
+      alert('任务名称不匹配，删除已取消');
+      return;
+    }
+
+    // 调用后端 API 删除
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('任务删除成功:', result);
+        alert('任务删除成功！');
+
+        // 刷新任务列表
+        const updatedList = await MockStore.getTasks(user.role);
+        setTasks([...updatedList]);
+      } else {
+        const error = await response.json();
+        console.error('删除失败:', error);
+        alert(`删除失败：${error.message || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error('删除任务错误:', error);
+      alert('删除任务时发生错误，请联系技术支持');
+    }
   };
 
   const handleSyncKOLs = async () => {
@@ -449,13 +499,22 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                         <button 
+                         <button
                              onClick={() => handleEditClick(task)}
                              className="p-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                          >
                             {t('common.edit')}
                          </button>
-                         
+
+                         {/* 删除按钮 */}
+                         <button
+                             onClick={() => handleDeleteTask(task)}
+                             className="p-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
+                             title="删除任务"
+                         >
+                            <Trash2 size={16} />
+                         </button>
+
                          {/* Sliding Toggle Switch */}
                          <button
                             type="button"

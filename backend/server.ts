@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -291,6 +291,32 @@ app.delete('/api/user/:userId', async (req, res) => {
     } catch (error) {
         console.error('[API] Delete User Error:', error);
         res.status(500).json({ error: 'Failed to delete user' });
+    }
+});
+
+// ----------------------------------------------------------------------
+// 删除任务（级联删除所有相关数据）
+// ----------------------------------------------------------------------
+app.delete('/api/tasks/:taskId', async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        console.log(`[API] 删除任务请求: ${taskId}`);
+
+        // 调用数据库删除函数
+        const result = await deleteTaskCascade(taskId);
+
+        console.log(`[API] 任务删除成功: ${taskId}`, result);
+        res.json({
+            success: true,
+            message: 'Task deleted successfully',
+            deletedCounts: result
+        });
+    } catch (error: any) {
+        console.error('[API] 删除任务错误:', error);
+        res.status(500).json({
+            error: 'Failed to delete task',
+            message: error.message || '未知错误'
+        });
     }
 });
 
