@@ -56,11 +56,45 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     const mt = await MockStore.getMyTasks(initialUser.id);
     const s = await MockStore.getStats(initialUser.id, initialUser.role);
 
+    // 3. 从后端 API 获取每个任务的真实点击统计
+    const updatedMyTasks = await Promise.all(
+        mt.map(async (task) => {
+            try {
+                const statsRes = await fetch(`/api/stats/affiliate/${initialUser.id}/task/${task.taskId}`);
+                if (statsRes.ok) {
+                    const stats = await statsRes.json();
+                    console.log(`[前端] 获取任务 ${task.taskId} 点击统计:`, stats);
+
+                    // 计算预估收益
+                    const tier = refreshedUser?.tier || 'BRONZE';
+                    const rate = TIER_RATES[tier as Tier] || 15;
+                    const estimatedEarnings = (stats.totalClicks * rate) / 1000;
+
+                    return {
+                        ...task,
+                        stats: {
+                            totalClicks: stats.totalClicks || 0,
+                            validClicks: stats.validClicks || 0,
+                            conversionRate: stats.totalClicks > 0 ? stats.validClicks / stats.totalClicks : 0,
+                            estimatedEarnings: estimatedEarnings
+                        }
+                    };
+                } else {
+                    console.warn(`[前端] 获取任务 ${task.taskId} 统计失败，使用默认值`);
+                    return task;
+                }
+            } catch (error) {
+                console.error(`[前端] 获取任务 ${task.taskId} 统计出错:`, error);
+                return task;
+            }
+        })
+    );
+
     // Filter out tasks already claimed
     const claimedIds = new Set(mt.map(i => i.taskId));
     setAllTasks(t);
     setAvailableTasks(t.filter(task => !claimedIds.has(task.id) && task.status === 'ACTIVE'));
-    setMyTasks(mt);
+    setMyTasks(updatedMyTasks);
     setStats(s);
   }, [initialUser]);
 

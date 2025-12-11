@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -143,6 +143,19 @@ app.get('/api/stats/affiliate/:userId', async (req, res) => {
     } catch (error) {
         console.error('Stats Error:', error);
         res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+});
+
+// 获取指定达人和任务的点击统计
+app.get('/api/stats/affiliate/:userId/task/:taskId', async (req, res) => {
+    try {
+        const { userId, taskId } = req.params;
+        const stats = await getStatsByCreatorAndTask(userId, taskId);
+        console.log(`[API] 获取任务点击统计: 达人 ${userId}, 任务 ${taskId}`, stats);
+        res.json(stats);
+    } catch (error) {
+        console.error('[API] 获取任务点击统计失败:', error);
+        res.status(500).json({ error: 'Failed to get task stats' });
     }
 });
 

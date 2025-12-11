@@ -157,6 +157,55 @@ export async function getStatsByCreator(creatorId: string) {
 }
 
 /**
+ * 获取指定达人和任务的点击统计
+ * @param creatorId - 达人用户 ID
+ * @param taskId - 任务 ID
+ * @returns 包含总点击数、有效点击数等信息
+ */
+export async function getStatsByCreatorAndTask(creatorId: string, taskId: string) {
+    const database = await initDB();
+
+    try {
+        // 查询该达人该任务的所有链接的点击总数
+        const result = database.exec(
+            `SELECT SUM(click_count) as total_clicks, COUNT(*) as link_count
+             FROM links
+             WHERE creator_user_id = ? AND task_id = ?`,
+            [creatorId, taskId]
+        );
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return {
+                totalClicks: 0,
+                validClicks: 0,
+                linkCount: 0
+            };
+        }
+
+        const totalClicks = result[0].values[0][0] || 0;
+        const linkCount = result[0].values[0][1] || 0;
+
+        // 假设所有点击都是有效点击（可以根据需求添加过滤逻辑）
+        const validClicks = totalClicks;
+
+        console.log(`[DB] 达人 ${creatorId} 任务 ${taskId} 统计: ${totalClicks} 次点击, ${linkCount} 个链接`);
+
+        return {
+            totalClicks: Number(totalClicks),
+            validClicks: Number(validClicks),
+            linkCount: Number(linkCount)
+        };
+    } catch (error) {
+        console.error('[DB] 获取点击统计失败:', error);
+        return {
+            totalClicks: 0,
+            validClicks: 0,
+            linkCount: 0
+        };
+    }
+}
+
+/**
  * 获取达人的详细统计信息 (用于运营侧显示)
  * @param creatorId - 达人用户 ID
  * @returns 包含 campaign 数量、点击数、短链接数等信息
