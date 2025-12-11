@@ -151,8 +151,9 @@ export const MockStore = {
                 foundAffiliate.pendingEarnings = profile.pending_earnings || foundAffiliate.pendingEarnings || 0;
 
                 // 同步 socialLinks 字段（防止 Profile 页面崩溃）
-                if (profile.social_links) {
-                    foundAffiliate.socialLinks = profile.social_links;
+                // 后端返回的字段名是 socialLinks（驼峰命名）
+                if (profile.socialLinks) {
+                    foundAffiliate.socialLinks = profile.socialLinks;
                 } else if (!foundAffiliate.socialLinks) {
                     // 如果后端和本地都没有 socialLinks，初始化为空对象
                     foundAffiliate.socialLinks = {
@@ -217,6 +218,26 @@ export const MockStore = {
 
     MOCK_AFFILIATES.unshift(newUser);
     saveData();
+
+    // 同步到后端数据库
+    try {
+        await fetch(`/api/user/profile/${newUser.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: newUser.name,
+                email: newUser.email,
+                avatar: newUser.avatar,
+                followerCount: newUser.followerCount,
+                socialLinks: newUser.socialLinks,
+                walletAddress: newUser.walletAddress
+            })
+        });
+        console.log(`✅ 新用户资料已同步到后端: ${newUser.id}`);
+    } catch (e) {
+        console.warn("⚠️ 注册时同步用户资料到后端失败:", e);
+    }
+
     return newUser;
   },
 

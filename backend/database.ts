@@ -423,12 +423,13 @@ export async function getUserProfile(userId: string) {
         }
     }
 
-    // 解析 social_links JSON
+    // 解析 social_links JSON 并映射为 socialLinks (驼峰命名)
     if (row.social_links) {
         try {
-            row.social_links = JSON.parse(row.social_links);
+            row.socialLinks = JSON.parse(row.social_links);
+            delete row.social_links; // 删除下划线命名的字段
         } catch (e) {
-            row.social_links = null;
+            row.socialLinks = null;
         }
     }
 

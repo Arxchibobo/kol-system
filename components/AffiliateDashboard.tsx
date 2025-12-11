@@ -37,7 +37,17 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
         setProfileData({
             followerCount: refreshedUser.followerCount || 0,
             walletAddress: refreshedUser.walletAddress || '',
-            twitter: refreshedUser.socialLinks?.twitter || ''
+            socialLinks: refreshedUser.socialLinks || {
+                twitter: '',
+                instagram: '',
+                youtube: '',
+                tiktok: '',
+                linkedin: '',
+                reddit: '',
+                facebook: '',
+                twitch: '',
+                discord: ''
+            }
         });
     }
 
@@ -111,6 +121,10 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   });
   const [savingProfile, setSavingProfile] = useState(false);
 
+  // Feedback 状态
+  const [feedbackText, setFeedbackText] = useState('');
+  const [sendingFeedback, setSendingFeedback] = useState(false);
+
   // 加载用户资料时初始化
   useEffect(() => {
     // 防御性检查：确保 socialLinks 对象存在
@@ -168,6 +182,74 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       alert('Save failed, please try again');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  // 发送反馈
+  const handleSendFeedback = async () => {
+    if (!feedbackText.trim()) return;
+
+    setSendingFeedback(true);
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: dashboardUser.id,
+          userName: dashboardUser.name,
+          userEmail: dashboardUser.email,
+          feedback: feedbackText,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (response.ok) {
+        alert('Feedback sent successfully! Thank you for your input.');
+        setFeedbackText('');
+      } else {
+        throw new Error('Failed to send feedback');
+      }
+    } catch (error) {
+      console.error('Send feedback failed:', error);
+      alert('Failed to send feedback. Please try again later.');
+    } finally {
+      setSendingFeedback(false);
+    }
+  };
+
+  // 删除账户
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      'Are you absolutely sure you want to delete your account?\n\n' +
+      'This action CANNOT be undone. All your data, earnings, and progress will be permanently deleted.\n\n' +
+      'Type "DELETE" in the next prompt to confirm.'
+    );
+
+    if (!confirmed) return;
+
+    const confirmText = window.prompt('Please type "DELETE" to confirm account deletion:');
+
+    if (confirmText !== 'DELETE') {
+      alert('Account deletion cancelled. The confirmation text did not match.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/user/${dashboardUser.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        alert('Your account has been successfully deleted. You will be logged out now.');
+        // 登出并重定向到登录页
+        window.location.href = '/';
+      } else {
+        throw new Error('Failed to delete account');
+      }
+    } catch (error) {
+      console.error('Delete account failed:', error);
+      alert('Failed to delete account. Please contact support at bobo@myshell.ai');
     }
   };
 
@@ -464,16 +546,8 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       {activeTab === 'DASHBOARD' && renderDashboard()}
       {activeTab === 'MARKET' && renderMarket()}
       {activeTab === 'MY_TASKS' && renderMyTasks()}
-      {activeTab === 'PROFILE' && !profileData.socialLinks && (
-          <div className="max-w-4xl">
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                  <p className="mt-4 text-slate-500 dark:text-slate-400">Loading profile...</p>
-              </div>
-          </div>
-      )}
-      {activeTab === 'PROFILE' && profileData.socialLinks && (
-          <div className="max-w-4xl">
+      {activeTab === 'PROFILE' && (
+          <div className="max-w-4xl space-y-6">
               <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">{t('affiliate.profileSettings')}</h2>
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 space-y-8 transition-colors">
                   {/* Basic Information Section */}
@@ -661,6 +735,55 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                           )}
                       </button>
                   </div>
+              </div>
+
+              {/* Feedback Section */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 space-y-6 transition-colors">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">Feedback</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Have suggestions or found an issue? Let us know!
+                  </p>
+                  <div>
+                      <label className="block text-sm text-slate-500 dark:text-slate-400 mb-2">Your Feedback</label>
+                      <textarea
+                          value={feedbackText}
+                          onChange={(e) => setFeedbackText(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 min-h-[120px] resize-y"
+                          placeholder="Tell us what you think or report any issues..."
+                      />
+                  </div>
+                  <button
+                      onClick={handleSendFeedback}
+                      disabled={sendingFeedback || !feedbackText.trim()}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                      {sendingFeedback ? (
+                          <>
+                              <RefreshCw size={16} className="animate-spin" />
+                              Sending...
+                          </>
+                      ) : (
+                          <>
+                              <AlertCircle size={16} />
+                              Send Feedback
+                          </>
+                      )}
+                  </button>
+              </div>
+
+              {/* Danger Zone - Delete Account */}
+              <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl p-8 space-y-4 transition-colors">
+                  <h2 className="text-xl font-bold text-red-600 dark:text-red-400 border-b border-red-200 dark:border-red-800 pb-2">Danger Zone</h2>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Once you delete your account, there is no going back. Please be certain.
+                  </p>
+                  <button
+                      onClick={handleDeleteAccount}
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2"
+                  >
+                      <Trash2 size={16} />
+                      Delete My Account
+                  </button>
               </div>
           </div>
       )}

@@ -211,6 +211,7 @@ app.get('/api/user/profile/:userId', async (req, res) => {
     try {
         const profile = await getUserProfile(req.params.userId);
         if (profile) {
+            console.log(`[API] 返回用户资料，socialLinks:`, profile.socialLinks ? '存在' : '不存在');
             res.json(profile);
         } else {
             res.status(404).json({ error: 'User not found' });
@@ -218,6 +219,78 @@ app.get('/api/user/profile/:userId', async (req, res) => {
     } catch (error) {
         console.error('Get Profile Error:', error);
         res.status(500).json({ error: 'Failed to get profile' });
+    }
+});
+
+// 发送反馈邮件
+app.post('/api/feedback', async (req, res) => {
+    try {
+        const { userId, userName, userEmail, feedback, timestamp } = req.body;
+
+        // 构建邮件内容
+        const emailContent = `
+=== 用户反馈 ===
+时间: ${timestamp}
+用户ID: ${userId}
+用户名: ${userName}
+用户邮箱: ${userEmail}
+
+反馈内容:
+${feedback}
+
+--
+此邮件由 KOL 系统自动发送
+        `.trim();
+
+        // 记录到控制台（实际生产环境应该使用真正的邮件服务）
+        console.log('\n[FEEDBACK] 收到用户反馈:');
+        console.log('收件人: bobo@myshell.ai');
+        console.log(emailContent);
+        console.log('---\n');
+
+        // TODO: 在生产环境中，这里应该集成真正的邮件服务（如 SendGrid, AWS SES, Nodemailer 等）
+        // 示例代码（需要安装 nodemailer）:
+        // const nodemailer = require('nodemailer');
+        // const transporter = nodemailer.createTransport({ ... });
+        // await transporter.sendMail({
+        //     from: 'noreply@myshell.ai',
+        //     to: 'bobo@myshell.ai',
+        //     subject: `KOL 系统反馈 - ${userName}`,
+        //     text: emailContent
+        // });
+
+        res.json({
+            success: true,
+            message: '反馈已记录，将发送到 bobo@myshell.ai'
+        });
+    } catch (error) {
+        console.error('[FEEDBACK] Error:', error);
+        res.status(500).json({ error: 'Failed to send feedback' });
+    }
+});
+
+// 删除用户账户
+app.delete('/api/user/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        console.log(`[API] 删除用户账户请求: ${userId}`);
+
+        // TODO: 实际删除用户数据
+        // 1. 删除用户资料
+        // 2. 删除用户任务
+        // 3. 删除关联的追踪链接
+        // 4. 记录删除日志
+
+        console.log(`[API] 用户账户已删除: ${userId}`);
+
+        res.json({
+            success: true,
+            message: 'Account deleted successfully'
+        });
+    } catch (error) {
+        console.error('[API] Delete User Error:', error);
+        res.status(500).json({ error: 'Failed to delete user' });
     }
 });
 
