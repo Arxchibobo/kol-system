@@ -464,7 +464,15 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       {activeTab === 'DASHBOARD' && renderDashboard()}
       {activeTab === 'MARKET' && renderMarket()}
       {activeTab === 'MY_TASKS' && renderMyTasks()}
-      {activeTab === 'PROFILE' && (
+      {activeTab === 'PROFILE' && !profileData.socialLinks && (
+          <div className="max-w-4xl">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+                  <p className="mt-4 text-slate-500 dark:text-slate-400">Loading profile...</p>
+              </div>
+          </div>
+      )}
+      {activeTab === 'PROFILE' && profileData.socialLinks && (
           <div className="max-w-4xl">
               <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">{t('affiliate.profileSettings')}</h2>
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 space-y-8 transition-colors">
