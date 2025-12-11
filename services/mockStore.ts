@@ -481,6 +481,35 @@ export const MockStore = {
     }
   },
 
+  // 删除任务（从 localStorage 中移除）
+  deleteTask: async (taskId: string) => {
+    const taskIndex = MOCK_TASKS.findIndex(t => t.id === taskId);
+    if (taskIndex !== -1) {
+      // 1. 从任务列表中移除
+      const deletedTask = MOCK_TASKS.splice(taskIndex, 1)[0];
+      console.log(`[MockStore] 删除任务: ${deletedTask.title} (${taskId})`);
+
+      // 2. 删除所有相关的达人任务记录
+      const affTasksBefore = MOCK_AFFILIATE_TASKS.length;
+      MOCK_AFFILIATE_TASKS.splice(0, MOCK_AFFILIATE_TASKS.length,
+        ...MOCK_AFFILIATE_TASKS.filter(at => at.taskId !== taskId)
+      );
+      const affTasksDeleted = affTasksBefore - MOCK_AFFILIATE_TASKS.length;
+      console.log(`[MockStore] 删除了 ${affTasksDeleted} 条达人任务记录`);
+
+      // 3. 保存到 localStorage
+      saveData();
+
+      return {
+        success: true,
+        taskDeleted: true,
+        affiliateTasksDeleted: affTasksDeleted
+      };
+    } else {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+  },
+
   getAffiliates: async () => {
     // 从后端获取所有用户的最新资料数据（tags, followerCount 等）
     // 并合并到 MOCK_AFFILIATES 中

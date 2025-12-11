@@ -234,7 +234,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       `此操作将：\n` +
       `1. 删除任务本身\n` +
       `2. 删除所有达人的领取记录\n` +
-      `3. 删除所有相关的追踪链接和点击数据\n\n` +
+      `3. 删除所有相关的追踪链接和点击数据（如果存在）\n\n` +
       `此操作不可撤销！`
     );
 
@@ -250,29 +250,37 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       return;
     }
 
-    // 调用后端 API 删除
     try {
-      const response = await fetch(`/api/tasks/${task.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      // 1. 从 MockStore (localStorage) 中删除任务
+      const mockResult = await MockStore.deleteTask(task.id);
+      console.log('[前端] MockStore 删除成功:', mockResult);
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('任务删除成功:', result);
-        alert('任务删除成功！');
+      // 2. 同时调用后端 API 清理数据库中的追踪数据（如果存在）
+      try {
+        const response = await fetch(`/api/tasks/${task.id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
 
-        // 刷新任务列表
-        const updatedList = await MockStore.getTasks(user.role);
-        setTasks([...updatedList]);
-      } else {
-        const error = await response.json();
-        console.error('删除失败:', error);
-        alert(`删除失败：${error.message || '未知错误'}`);
+        if (response.ok) {
+          const dbResult = await response.json();
+          console.log('[后端] 数据库清理成功:', dbResult);
+        } else {
+          // 数据库删除失败不影响整体结果（可能表不存在）
+          console.warn('[后端] 数据库清理失败，但任务已从系统中移除');
+        }
+      } catch (dbError) {
+        console.warn('[后端] 数据库清理出错，但任务已从系统中移除:', dbError);
       }
-    } catch (error) {
+
+      // 3. 显示成功消息并刷新列表
+      alert(`任务 "${task.title}" 删除成功！`);
+      const updatedList = await MockStore.getTasks(user.role);
+      setTasks([...updatedList]);
+
+    } catch (error: any) {
       console.error('删除任务错误:', error);
-      alert('删除任务时发生错误，请联系技术支持');
+      alert(`删除失败：${error.message || '未知错误'}`);
     }
   };
 
