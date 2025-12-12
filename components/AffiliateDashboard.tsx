@@ -817,16 +817,16 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                   {/* 通知设置部分 */}
                   <div className="space-y-6">
                       <h3 className="text-lg font-semibold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">
-                          通知设置
+                          Notification Settings
                       </h3>
 
                       <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-lg">
                           <div>
                               <label className="text-sm font-medium text-slate-900 dark:text-white block mb-1">
-                                  新任务提醒
+                                  New Task Alerts
                               </label>
                               <p className="text-xs text-slate-500 dark:text-slate-400">
-                                  有新任务发布时通知我
+                                  Notify me when new tasks are published
                               </p>
                           </div>
                           <input

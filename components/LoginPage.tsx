@@ -24,6 +24,7 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
   const [regYoutube, setRegYoutube] = useState('');
   const [regInstagram, setRegInstagram] = useState('');
   const [regTiktok, setRegTiktok] = useState('');
+  const [socialMediaError, setSocialMediaError] = useState('');
 
   // Modal State
   const [showRegPrompt, setShowRegPrompt] = useState(false);
@@ -66,6 +67,14 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
     e.preventDefault();
     if (!regName || !regEmail) return;
 
+    // 验证至少有一个社媒链接被填写
+    const hasSocialMedia = regTwitter || regYoutube || regInstagram || regTiktok;
+    if (!hasSocialMedia) {
+      setSocialMediaError('Please provide at least one social media profile');
+      return;
+    }
+
+    setSocialMediaError('');
     setLoading(true);
     // Simulate auto-grabbing data
     try {
@@ -222,43 +231,60 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
                             
                             <div className="pt-2">
                                 <label className="block text-xs font-bold text-indigo-500 dark:text-indigo-400 mb-2 uppercase tracking-wide">{t('login.formSocials')}</label>
+                                {socialMediaError && (
+                                    <div className="mb-3 text-red-500 text-xs font-medium bg-red-50 dark:bg-red-900/10 p-2 rounded-lg">
+                                        {socialMediaError}
+                                    </div>
+                                )}
                                 <div className="space-y-3">
                                     <div className="relative">
                                         <Twitter className="absolute left-3 top-3 text-slate-400 dark:text-slate-600" size={16} />
-                                        <input 
+                                        <input
                                             type="text"
                                             value={regTwitter}
-                                            onChange={e => setRegTwitter(e.target.value)}
+                                            onChange={e => {
+                                              setRegTwitter(e.target.value);
+                                              if (socialMediaError) setSocialMediaError('');
+                                            }}
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors"
                                             placeholder="Twitter Link"
                                         />
                                     </div>
                                     <div className="relative">
                                         <Youtube className="absolute left-3 top-3 text-slate-400 dark:text-slate-600" size={16} />
-                                        <input 
+                                        <input
                                             type="text"
                                             value={regYoutube}
-                                            onChange={e => setRegYoutube(e.target.value)}
+                                            onChange={e => {
+                                              setRegYoutube(e.target.value);
+                                              if (socialMediaError) setSocialMediaError('');
+                                            }}
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors"
                                             placeholder="YouTube Link"
                                         />
                                     </div>
                                     <div className="relative">
                                         <Instagram className="absolute left-3 top-3 text-slate-400 dark:text-slate-600" size={16} />
-                                        <input 
+                                        <input
                                             type="text"
                                             value={regInstagram}
-                                            onChange={e => setRegInstagram(e.target.value)}
+                                            onChange={e => {
+                                              setRegInstagram(e.target.value);
+                                              if (socialMediaError) setSocialMediaError('');
+                                            }}
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors"
                                             placeholder="Instagram Link"
                                         />
                                     </div>
                                     <div className="relative">
                                         <Music className="absolute left-3 top-3 text-slate-400 dark:text-slate-600" size={16} />
-                                        <input 
+                                        <input
                                             type="text"
                                             value={regTiktok}
-                                            onChange={e => setRegTiktok(e.target.value)}
+                                            onChange={e => {
+                                              setRegTiktok(e.target.value);
+                                              if (socialMediaError) setSocialMediaError('');
+                                            }}
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors"
                                             placeholder="TikTok Link"
                                         />

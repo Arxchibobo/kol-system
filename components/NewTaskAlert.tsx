@@ -45,16 +45,16 @@ export const NewTaskAlert: React.FC<NewTaskAlertProps> = ({
 
           {/* 标题 */}
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-            🎉 新任务来啦！
+            🎉 New Tasks Available!
           </h2>
 
           {/* 描述 */}
           <p className="text-slate-600 dark:text-slate-400 mb-6">
-            有 <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xl">{taskCount}</span> 个新任务已发布
+            <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xl">{taskCount}</span> new {taskCount === 1 ? 'task has' : 'tasks have'} been published
           </p>
 
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">
-            快来看看有没有适合您的推广机会，抢先领取任务，开始赚取收益！
+            Check out the new opportunities! Claim tasks now and start earning.
           </p>
 
           {/* 按钮组 */}
@@ -63,7 +63,7 @@ export const NewTaskAlert: React.FC<NewTaskAlertProps> = ({
               onClick={onViewTasks}
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
             >
-              查看新任务
+              View New Tasks
               <ChevronRight size={20} />
             </button>
 
@@ -71,7 +71,7 @@ export const NewTaskAlert: React.FC<NewTaskAlertProps> = ({
               onClick={onDismiss}
               className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium py-3 rounded-xl transition-colors"
             >
-              稍后再说
+              Later
             </button>
           </div>
         </div>
