@@ -47,6 +47,11 @@ export interface User {
   followerCount?: number;
   walletAddress?: string; // USDT
   tags?: string[]; // 达人标签分类（AI博主、时尚博主等）
+  // 通知设置
+  notificationSettings?: {
+    newTaskAlert: boolean; // 是否接收新任务提醒
+  };
+  lastSeenTaskTimestamp?: string; // 用户最后查看任务的时间戳
 }
 
 export interface Task {

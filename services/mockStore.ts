@@ -570,5 +570,25 @@ export const MockStore = {
           pendingPayout: MOCK_AFFILIATES.reduce((acc, curr) => acc + (curr.pendingEarnings || 0), 3500),
           flaggedCount: 12
       };
+  },
+
+  // 更新用户最后查看任务的时间戳
+  updateLastSeenTaskTimestamp: async (userId: string) => {
+    const user = MOCK_AFFILIATES.find(u => u.id === userId);
+    if (user) {
+      user.lastSeenTaskTimestamp = new Date().toISOString();
+      saveData();
+      console.log(`[MockStore] 更新用户 ${userId} 最后查看任务时间: ${user.lastSeenTaskTimestamp}`);
+    }
+  },
+
+  // 更新通知设置
+  updateNotificationSettings: async (userId: string, settings: { newTaskAlert: boolean }) => {
+    const user = MOCK_AFFILIATES.find(u => u.id === userId);
+    if (user) {
+      user.notificationSettings = settings;
+      saveData();
+      console.log(`[MockStore] 更新用户 ${userId} 通知设置:`, settings);
+    }
   }
 };

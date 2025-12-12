@@ -5,6 +5,8 @@ import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle,
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { TaskGuideModal } from './TaskGuideModal';
+import { NewTaskAlert } from './NewTaskAlert';
 
 interface Props {
   user: User;
@@ -21,9 +23,17 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const [stats, setStats] = useState<any[]>([]);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
-  
+
   // Modal State
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // 任务指引弹窗状态
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [guideModalTask, setGuideModalTask] = useState<Task | null>(null);
+
+  // 新任务提醒弹窗状态
+  const [showNewTaskAlert, setShowNewTaskAlert] = useState(false);
+  const [newTasksCount, setNewTasksCount] = useState(0);
 
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -92,10 +102,25 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
 
     // Filter out tasks already claimed
     const claimedIds = new Set(mt.map(i => i.taskId));
+    const available = t.filter(task => !claimedIds.has(task.id) && task.status === 'ACTIVE');
+
     setAllTasks(t);
-    setAvailableTasks(t.filter(task => !claimedIds.has(task.id) && task.status === 'ACTIVE'));
+    setAvailableTasks(available);
     setMyTasks(updatedMyTasks);
     setStats(s);
+
+    // 4. 检测新任务并显示提醒
+    if (refreshedUser) {
+      const lastSeen = refreshedUser.lastSeenTaskTimestamp || '1970-01-01';
+      const newTasks = available.filter(task => task.createdAt > lastSeen);
+
+      // 如果有新任务且用户开启了通知，显示提醒
+      if (newTasks.length > 0 && refreshedUser.notificationSettings?.newTaskAlert !== false) {
+        setNewTasksCount(newTasks.length);
+        setShowNewTaskAlert(true);
+        console.log(`[前端] 检测到 ${newTasks.length} 个新任务`);
+      }
+    }
   }, [initialUser]);
 
   useEffect(() => {
@@ -106,8 +131,31 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     const newTask = await MockStore.claimTask(dashboardUser.id, task);
     setMyTasks([...myTasks, newTask]);
     setAvailableTasks(availableTasks.filter(t => t.id !== task.id));
-    setSelectedTask(null); // Close modal
-    setActiveTab('MY_TASKS');
+    setSelectedTask(null); // 关闭任务详情模态框
+
+    // 显示任务指引弹窗
+    setGuideModalTask(task);
+    setShowGuideModal(true);
+  };
+
+  // 任务指引完成后的处理
+  const handleGuideComplete = () => {
+    setShowGuideModal(false);
+    setGuideModalTask(null);
+    setActiveTab('MY_TASKS'); // 跳转到 My Tasks 页面
+  };
+
+  // 查看新任务
+  const handleViewNewTasks = async () => {
+    setShowNewTaskAlert(false);
+    setActiveTab('MARKET');
+    // 更新最后查看时间戳
+    await MockStore.updateLastSeenTaskTimestamp(dashboardUser.id);
+  };
+
+  // 关闭新任务提醒
+  const handleDismissNewTaskAlert = () => {
+    setShowNewTaskAlert(false);
   };
   
   const handleGiveUp = async (affTaskId: string) => {
@@ -404,7 +452,14 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   );
   };
 
-  const renderMarket = () => (
+  const renderMarket = () => {
+    // 判断任务是否为新任务
+    const isNewTask = (task: Task) => {
+      const lastSeen = dashboardUser.lastSeenTaskTimestamp || '1970-01-01';
+      return task.createdAt > lastSeen;
+    };
+
+    return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {availableTasks.length === 0 && (
             <div className="col-span-3 text-center py-20 text-slate-500 dark:text-slate-400">
@@ -412,7 +467,13 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
             </div>
         )}
         {availableTasks.map(task => (
-            <div key={task.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col justify-between hover:border-indigo-500/50 transition-colors group shadow-sm dark:shadow-none">
+            <div key={task.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col justify-between hover:border-indigo-500/50 transition-colors group shadow-sm dark:shadow-none relative">
+                {/* 新任务徽章 */}
+                {isNewTask(task) && (
+                  <span className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                    NEW
+                  </span>
+                )}
                 <div>
                     <div className="flex justify-between items-start mb-4">
                         <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-bold px-2 py-1 rounded uppercase">{t('affiliate.new')}</span>
@@ -440,7 +501,8 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
             </div>
         ))}
     </div>
-  );
+    );
+  };
 
   const renderMyTasks = () => (
     <div className="space-y-6">
@@ -752,6 +814,37 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                       </div>
                   </div>
 
+                  {/* 通知设置部分 */}
+                  <div className="space-y-6">
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">
+                          通知设置
+                      </h3>
+
+                      <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950 rounded-lg">
+                          <div>
+                              <label className="text-sm font-medium text-slate-900 dark:text-white block mb-1">
+                                  新任务提醒
+                              </label>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  有新任务发布时通知我
+                              </p>
+                          </div>
+                          <input
+                              type="checkbox"
+                              checked={dashboardUser.notificationSettings?.newTaskAlert !== false}
+                              onChange={async (e) => {
+                                  const newSettings = { newTaskAlert: e.target.checked };
+                                  await MockStore.updateNotificationSettings(dashboardUser.id, newSettings);
+                                  const updatedUser = await MockStore.login(dashboardUser.email);
+                                  if (updatedUser) {
+                                      setDashboardUser(updatedUser);
+                                  }
+                              }}
+                              className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 focus:ring-2"
+                          />
+                      </div>
+                  </div>
+
                   {/* Save Button */}
                   <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
                       <button
@@ -884,6 +977,25 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                 </div>
             </div>
         </div>
+      )}
+
+      {/* 任务指引弹窗 */}
+      {showGuideModal && guideModalTask && (
+        <TaskGuideModal
+          isOpen={showGuideModal}
+          taskTitle={guideModalTask.title}
+          onComplete={handleGuideComplete}
+        />
+      )}
+
+      {/* 新任务提醒弹窗 */}
+      {showNewTaskAlert && (
+        <NewTaskAlert
+          isOpen={showNewTaskAlert}
+          taskCount={newTasksCount}
+          onViewTasks={handleViewNewTasks}
+          onDismiss={handleDismissNewTaskAlert}
+        />
       )}
     </div>
   );
