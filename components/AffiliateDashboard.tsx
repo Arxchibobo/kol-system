@@ -423,7 +423,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     
                     <div className="space-y-2 mb-6">
                         <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                            <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/> {t('affiliate.baseReward', { rate: task.rewardRate })}
+                            <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/> {t('affiliate.baseReward', { rate: task.rewardRate || 0 })}
                         </div>
                         <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
                             <Target size={14} className="mr-2 text-indigo-600 dark:text-indigo-400"/> {t('affiliate.requirements', { count: task.requirements.length })}
@@ -831,7 +831,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                         <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{selectedTask.title}</h3>
                         <div className="flex items-center gap-4 text-sm">
                             <span className="flex items-center text-emerald-600 dark:text-emerald-400 font-medium">
-                                <DollarSign size={16} className="mr-1"/> {t('affiliate.baseReward', { rate: selectedTask.rewardRate })}
+                                <DollarSign size={16} className="mr-1"/> {t('affiliate.baseReward', { rate: selectedTask.rewardRate || 0 })}
                             </span>
                             <span className="text-slate-500 dark:text-slate-400">
                                 Deadline: {new Date(selectedTask.deadline).toLocaleDateString()}
