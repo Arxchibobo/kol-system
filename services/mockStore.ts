@@ -241,6 +241,84 @@ export const MockStore = {
     return newUser;
   },
 
+  // 批量注册用户（用于 CSV 导入）
+  batchRegister: async (users: Partial<User>[]): Promise<{ success: number; skipped: number; errors: string[] }> => {
+    const result = {
+      success: 0,
+      skipped: 0,
+      errors: [] as string[]
+    };
+
+    for (const userData of users) {
+      try {
+        // 跳过没有 email 的用户
+        if (!userData.email) {
+          result.skipped++;
+          result.errors.push(`跳过用户 "${userData.name}": 没有邮箱地址`);
+          continue;
+        }
+
+        // 检查是否已存在
+        const existing = MOCK_AFFILIATES.find(u => u.email === userData.email);
+        if (existing) {
+          result.skipped++;
+          result.errors.push(`跳过用户 "${userData.name}": 邮箱 ${userData.email} 已存在`);
+          continue;
+        }
+
+        // 创建新用户
+        const newUser: User = {
+          id: `import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: userData.name || 'Unknown',
+          email: userData.email,
+          role: UserRole.AFFILIATE,
+          avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'U')}&background=random`,
+          tier: userData.tier || Tier.BRONZE,
+          totalEarnings: userData.totalEarnings || 0,
+          pendingEarnings: userData.pendingEarnings || 0,
+          totalClicks: userData.totalClicks || 0,
+          validClicks: userData.validClicks || 0,
+          followerCount: userData.followerCount || 0,
+          socialLinks: userData.socialLinks || {},
+          walletAddress: userData.walletAddress || '',
+          tags: userData.tags || [],
+          notificationSettings: userData.notificationSettings || { newTaskAlert: true }
+        };
+
+        MOCK_AFFILIATES.unshift(newUser);
+        result.success++;
+
+        // 同步到后端数据库
+        try {
+          await fetch(`/api/user/profile/${newUser.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: newUser.name,
+              email: newUser.email,
+              avatar: newUser.avatar,
+              tier: newUser.tier,
+              followerCount: newUser.followerCount,
+              socialLinks: newUser.socialLinks,
+              walletAddress: newUser.walletAddress,
+              tags: newUser.tags
+            })
+          });
+        } catch (e) {
+          console.warn(`⚠️ 同步用户 ${newUser.id} 到后端失败:`, e);
+        }
+      } catch (error) {
+        result.errors.push(`导入用户 "${userData.name}" 失败: ${error}`);
+      }
+    }
+
+    // 保存到 localStorage
+    saveData();
+
+    console.log(`📊 批量导入完成: 成功 ${result.success}, 跳过 ${result.skipped}`);
+    return result;
+  },
+
   getTasks: async (role: UserRole): Promise<Task[]> => {
     return JSON.parse(JSON.stringify(MOCK_TASKS));
   },

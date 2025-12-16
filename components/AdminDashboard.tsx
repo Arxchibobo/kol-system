@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { User, Task, TaskStatus, Settlement, Tier, UserRole } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2 } from 'lucide-react';
+import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { parseAndValidateCSV, generatePreviewData, getTierStats, getTagStats, ImportResult } from '../utils/csvImporter';
 
 interface Props {
   user: User;
@@ -63,6 +64,13 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     tags: [],
     socialLinks: { twitter: '', youtube: '', instagram: '', tiktok: '' }
   });
+
+  // CSV Import State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [showImportPreview, setShowImportPreview] = useState(false);
 
   const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1FrjSNSrNZTMgWl1dDBZIOTWQOgEO7An9UKNxUmRepG0/edit?gid=1698530545#gid=1698530545";
 
@@ -391,6 +399,71 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     });
   };
 
+  // CSV 导入处理函数
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFile(file);
+    setImporting(true);
+
+    try {
+      const result = await parseAndValidateCSV(file);
+      setImportResult(result);
+      setShowImportPreview(true);
+    } catch (error) {
+      console.error('CSV 解析失败:', error);
+      setSyncMessage('CSV 解析失败，请检查文件格式');
+      setTimeout(() => setSyncMessage(null), 3000);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importResult || importResult.users.length === 0) return;
+
+    setImporting(true);
+    setSyncMessage(null);
+
+    try {
+      // 批量注册用户
+      const result = await MockStore.batchRegister(importResult.users);
+
+      // 刷新达人列表
+      const updatedList = await MockStore.getAffiliates();
+      setAffiliates(updatedList);
+
+      // 更新概览数据
+      const ov = await MockStore.getAdminOverviewStats();
+      setOverviewData(ov);
+
+      // 显示成功消息
+      setSyncMessage(`导入完成: 成功 ${result.success} 个, 跳过 ${result.skipped} 个`);
+      setTimeout(() => setSyncMessage(null), 5000);
+
+      // 关闭模态框
+      setShowImportModal(false);
+      setShowImportPreview(false);
+      setImportFile(null);
+      setImportResult(null);
+    } catch (error) {
+      console.error('导入失败:', error);
+      setSyncMessage('导入失败，请重试');
+      setTimeout(() => setSyncMessage(null), 3000);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleCancelImport = () => {
+    setShowImportModal(false);
+    setShowImportPreview(false);
+    setImportFile(null);
+    setImportResult(null);
+    setSyncMessage(null);
+  };
+
   const renderNav = () => (
     <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit mb-8 transition-colors">
         {[
@@ -701,7 +774,15 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2 w-full md:w-auto">
-                        <button 
+                        <button
+                            onClick={() => setShowImportModal(true)}
+                            className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap transition-colors"
+                        >
+                            <Upload size={16} />
+                            Import CSV
+                        </button>
+
+                        <button
                             onClick={() => setShowAddKolModal(true)}
                             className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap transition-colors"
                         >
@@ -709,7 +790,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             {t('admin.manualAdd')}
                         </button>
 
-                        <button 
+                        <button
                             onClick={handleSyncKOLs}
                             disabled={syncing}
                             className="flex-1 md:flex-none bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap transition-colors border border-slate-200 dark:border-slate-700"
@@ -717,8 +798,8 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
                             {syncing ? t('admin.syncing') : t('admin.syncKol')}
                         </button>
-                        
-                        <a 
+
+                        <a
                             href={GOOGLE_SHEET_URL}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -1143,6 +1224,204 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                 <button onClick={() => setShowAddKolModal(false)} className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">{t('common.cancel')}</button>
                                 <button onClick={handleAddKol} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">{t('common.add')}</button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CSV Import Modal */}
+            {showImportModal && !showImportPreview && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl w-full max-w-lg relative transition-colors shadow-2xl">
+                        <button onClick={handleCancelImport} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                            <X size={20}/>
+                        </button>
+
+                        <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">导入 KOL 数据</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                            上传 CSV 文件批量导入 KOL 信息。文件应包含以下列：Name, Handle, Platform, Tier, Followers, Category, Email 等。
+                        </p>
+
+                        <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center hover:border-indigo-500 transition-colors">
+                            <input
+                                type="file"
+                                accept=".csv"
+                                onChange={handleFileSelect}
+                                className="hidden"
+                                id="csv-upload"
+                                disabled={importing}
+                            />
+                            <label
+                                htmlFor="csv-upload"
+                                className="cursor-pointer flex flex-col items-center gap-3"
+                            >
+                                <Upload size={48} className="text-slate-400" />
+                                <div>
+                                    <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">
+                                        点击选择 CSV 文件
+                                    </p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        或拖拽文件到此处
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+
+                        {importing && (
+                            <div className="mt-4 flex items-center justify-center gap-2 text-indigo-600 dark:text-indigo-400">
+                                <RefreshCw size={16} className="animate-spin" />
+                                <span className="text-sm">正在解析文件...</span>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                onClick={handleCancelImport}
+                                className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                            >
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CSV Import Preview Modal */}
+            {showImportPreview && importResult && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-8 rounded-2xl w-full max-w-6xl relative transition-colors shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                        <button onClick={handleCancelImport} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                            <X size={20}/>
+                        </button>
+
+                        <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">导入预览</h3>
+
+                        {/* 统计信息 */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-lg">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">总数</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">{importResult.total}</p>
+                            </div>
+                            <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4 rounded-lg">
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">将导入</p>
+                                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{importResult.success}</p>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-lg">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">GOLD</p>
+                                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{getTierStats(importResult.users).gold}</p>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-lg">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">SILVER</p>
+                                <p className="text-2xl font-bold text-slate-400">{getTierStats(importResult.users).silver}</p>
+                            </div>
+                        </div>
+
+                        {/* 标签统计 */}
+                        <div className="mb-4">
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">标签分布:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {Object.entries(getTagStats(importResult.users)).map(([tag, count]) => (
+                                    <span
+                                        key={tag}
+                                        className="px-3 py-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-sm font-medium"
+                                    >
+                                        {tag}: {count}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 预览表格 */}
+                        <div className="flex-1 overflow-auto custom-scrollbar mb-6">
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">前 10 条预览:</p>
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50 dark:bg-slate-950 sticky top-0">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">名称</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">邮箱</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">等级</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">粉丝数</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">标签</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {generatePreviewData(importResult.users, 10).map((user, idx) => (
+                                        <tr key={idx} className="border-b border-slate-200 dark:border-slate-800">
+                                            <td className="px-4 py-2 text-slate-900 dark:text-white">{user.name}</td>
+                                            <td className="px-4 py-2 text-slate-600 dark:text-slate-400 font-mono text-xs">
+                                                {user.email || <span className="text-slate-400">（无）</span>}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                                    user.tier === Tier.GOLD ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                                                    user.tier === Tier.SILVER ? 'bg-slate-200 dark:bg-slate-200/10 text-slate-600 dark:text-slate-300' :
+                                                    'bg-amber-700/10 text-amber-600 dark:text-amber-600'
+                                                }`}>
+                                                    {user.tier}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-slate-600 dark:text-slate-400">
+                                                {user.followerCount?.toLocaleString() || 0}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {user.tags?.slice(0, 2).map((tag, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className="px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded text-xs"
+                                                        >
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* 错误信息 */}
+                        {importResult.errors.length > 0 && (
+                            <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg max-h-32 overflow-y-auto">
+                                <p className="text-sm font-medium text-amber-900 dark:text-amber-200 mb-2">
+                                    ⚠️ 注意事项 ({importResult.errors.length} 条):
+                                </p>
+                                <ul className="text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                                    {importResult.errors.slice(0, 5).map((error, idx) => (
+                                        <li key={idx}>• {error}</li>
+                                    ))}
+                                    {importResult.errors.length > 5 && (
+                                        <li className="font-medium">... 还有 {importResult.errors.length - 5} 条</li>
+                                    )}
+                                </ul>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800 pt-4">
+                            <button
+                                onClick={handleCancelImport}
+                                className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                disabled={importing}
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleConfirmImport}
+                                disabled={importing}
+                                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {importing ? (
+                                    <>
+                                        <RefreshCw size={16} className="animate-spin" />
+                                        导入中...
+                                    </>
+                                ) : (
+                                    <>
+                                        确认导入 {importResult.success} 个 KOL
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
