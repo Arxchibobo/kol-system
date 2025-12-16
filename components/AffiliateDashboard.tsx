@@ -127,6 +127,23 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     loadData();
   }, [loadData, activeTab]);
 
+  // 实时同步：每 10 秒自动刷新数据
+  useEffect(() => {
+    console.log('🔄 [达人端] 启动自动同步，每 10 秒刷新一次');
+
+    // 设置定时器，每 10 秒刷新一次
+    const intervalId = setInterval(() => {
+      console.log('⏰ [达人端] 自动刷新数据...');
+      loadData();
+    }, 10000); // 10 秒
+
+    // 清理定时器
+    return () => {
+      console.log('🛑 [达人端] 停止自动同步');
+      clearInterval(intervalId);
+    };
+  }, [loadData]); // 依赖 loadData，确保使用最新的函数
+
   const handleClaim = async (task: Task) => {
     const newTask = await MockStore.claimTask(dashboardUser.id, task);
     setMyTasks([...myTasks, newTask]);
@@ -389,14 +406,22 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
         {/* Stats Grid - Performance (Real-time) */}
         <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Performance (Real-time)</h3>
-            <button
-                onClick={handleRefreshStats}
-                disabled={refreshing}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                title="刷新数据"
-            >
-                <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
-            </button>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={handleRefreshStats}
+                    disabled={refreshing}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    title="手动刷新（系统每 10 秒自动刷新）"
+                >
+                    <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+                </button>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
+                    <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                        {refreshing ? '同步中...' : '实时同步'}
+                    </span>
+                </div>
+            </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors">
@@ -508,14 +533,22 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     <div className="space-y-6">
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('affiliate.myTasks')}</h2>
-            <button
-                onClick={handleRefreshStats}
-                disabled={refreshing}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                title="Refresh Data"
-            >
-                <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
-            </button>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={handleRefreshStats}
+                    disabled={refreshing}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    title="手动刷新（系统每 10 秒自动刷新）"
+                >
+                    <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+                </button>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
+                    <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                        {refreshing ? '同步中...' : '实时同步'}
+                    </span>
+                </div>
+            </div>
         </div>
 
         {myTasks.length === 0 && (
