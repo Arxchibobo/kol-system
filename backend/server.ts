@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, getAllTasks, createTask, updateTask, getTaskById } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -308,6 +308,77 @@ app.delete('/api/user/:userId', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------
+// 任务管理 API
+// ----------------------------------------------------------------------
+
+// 获取所有任务（从数据库）
+app.get('/api/tasks', async (req, res) => {
+    try {
+        console.log('[API] 获取所有任务');
+
+        // 从数据库获取所有任务
+        const tasks = await getAllTasks();
+
+        console.log(`[API] 返回 ${tasks.length} 个任务`);
+        res.json(tasks);
+    } catch (error: any) {
+        console.error('[API] 获取任务错误:', error);
+        res.status(500).json({
+            error: 'Failed to fetch tasks',
+            message: error.message || '未知错误'
+        });
+    }
+});
+
+// 创建新任务
+app.post('/api/tasks', async (req, res) => {
+    try {
+        const taskData = req.body;
+        console.log('[API] 创建任务:', taskData.title);
+
+        // 保存到数据库
+        await createTask(taskData);
+
+        console.log('[API] 任务创建成功');
+        res.json({
+            success: true,
+            message: 'Task created successfully',
+            task: taskData
+        });
+    } catch (error: any) {
+        console.error('[API] 创建任务错误:', error);
+        res.status(500).json({
+            error: 'Failed to create task',
+            message: error.message || '未知错误'
+        });
+    }
+});
+
+// 更新任务
+app.put('/api/tasks/:taskId', async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        const taskData = req.body;
+        console.log('[API] 更新任务:', taskId, taskData.title);
+
+        // 更新数据库
+        await updateTask(taskId, taskData);
+
+        console.log('[API] 任务更新成功');
+        res.json({
+            success: true,
+            message: 'Task updated successfully',
+            task: taskData
+        });
+    } catch (error: any) {
+        console.error('[API] 更新任务错误:', error);
+        res.status(500).json({
+            error: 'Failed to update task',
+            message: error.message || '未知错误'
+        });
+    }
+});
+
 // 删除任务（级联删除所有相关数据）
 // ----------------------------------------------------------------------
 app.delete('/api/tasks/:taskId', async (req, res) => {

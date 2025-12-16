@@ -128,28 +128,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const taskList = await MockStore.getTasks(user.role);
-      const s = await MockStore.getStats(user.id, user.role);
-      const sett = await MockStore.getSettlements();
-      const aff = await MockStore.getAffiliates();
-      const ov = await MockStore.getAdminOverviewStats();
-
-      setTasks(taskList);
-      setStats(s);
-      setSettlements(sett);
-      setAffiliates(aff);
-      setOverviewData(ov);
-
-      // 获取真实数据
-      fetchRealTotalStats();
-      fetchAnomalies();
-    };
-    fetchData();
-  }, [user]);
-
-  // 实时同步：每 10 秒自动刷新任务列表
+  // 实时同步：组件加载时立即刷新，然后每 10 秒自动刷新
   useEffect(() => {
     console.log('🔄 启动自动同步，每 10 秒刷新一次');
 

@@ -83,6 +83,23 @@ export async function initDB() {
             );
         `);
 
+        // 4. 任务表 (存储运营后台创建的所有任务)
+        db.run(`
+            CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                product_link TEXT,
+                reward_per_click REAL DEFAULT 0,
+                status TEXT DEFAULT 'ACTIVE',
+                deadline TEXT,
+                requirements TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);`);
+
         // 保存数据库到文件
         saveDB();
 
@@ -585,5 +602,110 @@ export async function deleteTaskCascade(taskId: string): Promise<{
     } catch (error) {
         console.error('[DB] 级联删除任务失败:', error);
         throw error;
+    }
+}
+
+// ----------------------------------------------------------------------
+// 任务 CRUD 操作
+// ----------------------------------------------------------------------
+
+// 获取所有任务
+export async function getAllTasks() {
+    const database = await initDB();
+    try {
+        const result = database.exec(`SELECT * FROM tasks ORDER BY created_at DESC`);
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const task: any = {};
+            columns.forEach((col: string, index: number) => {
+                task[col] = row[index];
+            });
+            return task;
+        });
+    } catch (error) {
+        console.error('[DB] 获取任务失败:', error);
+        return [];
+    }
+}
+
+// 创建新任务
+export async function createTask(taskData: any) {
+    const database = await initDB();
+    try {
+        database.run(
+            `INSERT INTO tasks (id, title, description, product_link, reward_per_click, status, deadline, requirements, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [
+                taskData.id,
+                taskData.title,
+                taskData.description || '',
+                taskData.productLink || '',
+                taskData.rewardPerClick || 0,
+                taskData.status || 'ACTIVE',
+                taskData.deadline || null,
+                taskData.requirements || ''
+            ]
+        );
+        saveDB();
+        console.log(`[DB] 任务创建成功: ${taskData.id}`);
+        return { success: true, id: taskData.id };
+    } catch (error) {
+        console.error('[DB] 创建任务失败:', error);
+        throw error;
+    }
+}
+
+// 更新任务
+export async function updateTask(taskId: string, taskData: any) {
+    const database = await initDB();
+    try {
+        database.run(
+            `UPDATE tasks
+             SET title = ?, description = ?, product_link = ?, reward_per_click = ?,
+                 status = ?, deadline = ?, requirements = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [
+                taskData.title,
+                taskData.description || '',
+                taskData.productLink || '',
+                taskData.rewardPerClick || 0,
+                taskData.status || 'ACTIVE',
+                taskData.deadline || null,
+                taskData.requirements || '',
+                taskId
+            ]
+        );
+        saveDB();
+        console.log(`[DB] 任务更新成功: ${taskId}`);
+        return { success: true, id: taskId };
+    } catch (error) {
+        console.error('[DB] 更新任务失败:', error);
+        throw error;
+    }
+}
+
+// 根据 ID 获取单个任务
+export async function getTaskById(taskId: string) {
+    const database = await initDB();
+    try {
+        const result = database.exec(`SELECT * FROM tasks WHERE id = ?`, [taskId]);
+        if (result.length === 0 || result[0].values.length === 0) {
+            return null;
+        }
+
+        const columns = result[0].columns;
+        const row = result[0].values[0];
+        const task: any = {};
+        columns.forEach((col: string, index: number) => {
+            task[col] = row[index];
+        });
+        return task;
+    } catch (error) {
+        console.error('[DB] 获取任务失败:', error);
+        return null;
     }
 }
