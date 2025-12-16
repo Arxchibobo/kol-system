@@ -6,6 +6,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { parseAndValidateCSV, generatePreviewData, getTierStats, getTagStats, ImportResult } from '../utils/csvImporter';
+import { autoImportAllKOLs } from '../utils/autoImportKOLs';
 
 interface Props {
   user: User;
@@ -464,6 +465,52 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setSyncMessage(null);
   };
 
+  // 自动导入全部 KOL
+  const handleAutoImportAll = async () => {
+    setImporting(true);
+    setSyncMessage('正在自动导入所有 KOL...');
+
+    try {
+      // 读取两个 CSV 文件
+      const response1 = await fetch('/KOL_Export_2025-12-16.csv');
+      const file1Content = await response1.text();
+
+      const response2 = await fetch('/博主合作数据库 2933f81ff51e808cbc21e9c140005179.csv');
+      const file2Content = await response2.text();
+
+      // 解析和处理
+      const { users, stats } = await autoImportAllKOLs(file1Content, file2Content);
+
+      console.log('📊 导入统计:', stats);
+
+      // 批量注册
+      const result = await MockStore.batchRegister(users);
+
+      // 刷新列表
+      const updatedList = await MockStore.getAffiliates();
+      setAffiliates(updatedList);
+
+      const ov = await MockStore.getAdminOverviewStats();
+      setOverviewData(ov);
+
+      // 显示结果
+      setSyncMessage(`🎉 自动导入完成！
+        总计: ${stats.total} 个 KOL
+        成功导入: ${result.success} 个
+        跳过重复: ${result.skipped} 个
+        GOLD: ${stats.tierStats.gold} | SILVER: ${stats.tierStats.silver} | BRONZE: ${stats.tierStats.bronze}
+        有邮箱: ${stats.withEmail} | 无邮箱: ${stats.withoutEmail}`);
+
+      setTimeout(() => setSyncMessage(null), 10000);
+    } catch (error) {
+      console.error('自动导入失败:', error);
+      setSyncMessage(`❌ 自动导入失败: ${error}`);
+      setTimeout(() => setSyncMessage(null), 5000);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const renderNav = () => (
     <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit mb-8 transition-colors">
         {[
@@ -774,6 +821,25 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2 w-full md:w-auto">
+                        <button
+                            onClick={handleAutoImportAll}
+                            disabled={importing}
+                            className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="自动导入所有 CSV 文件中的 KOL"
+                        >
+                            {importing ? (
+                                <>
+                                    <RefreshCw size={16} className="animate-spin" />
+                                    导入中...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle size={16} />
+                                    自动导入全部
+                                </>
+                            )}
+                        </button>
+
                         <button
                             onClick={() => setShowImportModal(true)}
                             className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap transition-colors"
