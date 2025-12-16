@@ -251,26 +251,71 @@ export const MockStore = {
 
     for (const userData of users) {
       try {
-        // 跳过没有 email 的用户
-        if (!userData.email) {
+        // 生成唯一标识（优先使用 Instagram handle，其次 email，最后使用 name）
+        let uniqueKey = '';
+        if (userData.socialLinks?.instagram) {
+          // 从 Instagram URL 提取 handle
+          const instagramHandle = userData.socialLinks.instagram.split('/').filter(Boolean).pop();
+          uniqueKey = instagramHandle?.toLowerCase() || '';
+        }
+
+        if (!uniqueKey && userData.email) {
+          uniqueKey = userData.email.toLowerCase();
+        }
+
+        if (!uniqueKey && userData.name) {
+          uniqueKey = userData.name.toLowerCase();
+        }
+
+        if (!uniqueKey) {
           result.skipped++;
-          result.errors.push(`跳过用户 "${userData.name}": 没有邮箱地址`);
+          result.errors.push(`跳过用户: 无法生成唯一标识`);
           continue;
         }
 
-        // 检查是否已存在
-        const existing = MOCK_AFFILIATES.find(u => u.email === userData.email);
+        // 检查是否已存在（基于多个字段检查去重）
+        const existing = MOCK_AFFILIATES.find(u => {
+          // 优先通过 Instagram handle 去重
+          if (userData.socialLinks?.instagram && u.socialLinks?.instagram) {
+            const newHandle = userData.socialLinks.instagram.split('/').filter(Boolean).pop()?.toLowerCase();
+            const existingHandle = u.socialLinks.instagram.split('/').filter(Boolean).pop()?.toLowerCase();
+            if (newHandle && existingHandle && newHandle === existingHandle) return true;
+          }
+
+          // 如果都有邮箱，通过邮箱去重
+          if (userData.email && u.email && userData.email.toLowerCase() === u.email.toLowerCase()) {
+            return true;
+          }
+
+          // 最后通过名称去重
+          if (userData.name && u.name && userData.name.toLowerCase() === u.name.toLowerCase()) {
+            return true;
+          }
+
+          return false;
+        });
+
         if (existing) {
           result.skipped++;
-          result.errors.push(`跳过用户 "${userData.name}": 邮箱 ${userData.email} 已存在`);
+          result.errors.push(`跳过用户 "${userData.name}": 已存在`);
           continue;
+        }
+
+        // 生成邮箱（如果没有邮箱，使用 Instagram handle 生成临时邮箱）
+        let email = userData.email || '';
+        if (!email && userData.socialLinks?.instagram) {
+          const handle = userData.socialLinks.instagram.split('/').filter(Boolean).pop();
+          email = `${handle}@instagram.imported`;
+        }
+        if (!email && userData.name) {
+          email = `${userData.name.toLowerCase().replace(/\s+/g, '_')}@imported.myshell`;
         }
 
         // 创建新用户
         const newUser: User = {
           id: `import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name: userData.name || 'Unknown',
-          email: userData.email,
+          email: email,
           role: UserRole.AFFILIATE,
           avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'U')}&background=random`,
           tier: userData.tier || Tier.BRONZE,
