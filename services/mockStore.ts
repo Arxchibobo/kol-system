@@ -365,6 +365,29 @@ export const MockStore = {
   },
 
   getTasks: async (role: UserRole): Promise<Task[]> => {
+    try {
+      // 优先从后端获取最新数据
+      console.log('🔄 正在从后端获取任务列表...');
+      const response = await fetch('/api/tasks');
+
+      if (response.ok) {
+        const backendTasks = await response.json();
+
+        // 更新本地缓存
+        MOCK_TASKS = backendTasks;
+        saveData();
+
+        console.log(`✅ 从后端成功获取 ${backendTasks.length} 个任务`);
+        return JSON.parse(JSON.stringify(backendTasks));
+      } else {
+        console.warn(`⚠️ 后端返回错误状态: ${response.status}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ 从后端获取任务失败，使用本地缓存:', error);
+    }
+
+    // 后端失败时使用本地缓存
+    console.log(`📦 使用本地缓存，共 ${MOCK_TASKS.length} 个任务`);
     return JSON.parse(JSON.stringify(MOCK_TASKS));
   },
 
@@ -576,6 +599,26 @@ export const MockStore = {
     if (!taskWithId.status) {
         taskWithId.status = TaskStatus.ACTIVE;
     }
+
+    try {
+      // 先保存到后端
+      console.log('💾 正在保存任务到后端...');
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskWithId)
+      });
+
+      if (response.ok) {
+        console.log(`✅ 任务已成功保存到后端: ${taskWithId.title}`);
+      } else {
+        console.warn(`⚠️ 后端保存任务失败，状态: ${response.status}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ 保存任务到后端失败:', error);
+    }
+
+    // 更新本地缓存
     MOCK_TASKS.unshift(taskWithId);
     saveData();
   },
@@ -583,6 +626,25 @@ export const MockStore = {
   updateTask: async (task: Task) => {
     const index = MOCK_TASKS.findIndex(t => t.id === task.id);
     if (index !== -1) {
+      try {
+        // 先更新后端
+        console.log('🔄 正在更新任务到后端...');
+        const response = await fetch(`/api/tasks/${task.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(task)
+        });
+
+        if (response.ok) {
+          console.log(`✅ 任务已成功更新到后端: ${task.title}`);
+        } else {
+          console.warn(`⚠️ 后端更新任务失败，状态: ${response.status}`);
+        }
+      } catch (error) {
+        console.warn('⚠️ 更新任务到后端失败:', error);
+      }
+
+      // 更新本地缓存
       MOCK_TASKS[index] = task;
       saveData();
     }
@@ -608,8 +670,26 @@ export const MockStore = {
   deleteTask: async (taskId: string) => {
     const taskIndex = MOCK_TASKS.findIndex(t => t.id === taskId);
     if (taskIndex !== -1) {
+      const deletedTask = MOCK_TASKS[taskIndex];
+
+      try {
+        // 先删除后端数据
+        console.log('🗑️ 正在从后端删除任务...');
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          console.log(`✅ 任务已成功从后端删除: ${deletedTask.title}`);
+        } else {
+          console.warn(`⚠️ 后端删除任务失败，状态: ${response.status}`);
+        }
+      } catch (error) {
+        console.warn('⚠️ 从后端删除任务失败:', error);
+      }
+
       // 1. 从任务列表中移除
-      const deletedTask = MOCK_TASKS.splice(taskIndex, 1)[0];
+      MOCK_TASKS.splice(taskIndex, 1);
       console.log(`[MockStore] 删除任务: ${deletedTask.title} (${taskId})`);
 
       // 2. 删除所有相关的达人任务记录

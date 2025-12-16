@@ -149,6 +149,26 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     fetchData();
   }, [user]);
 
+  // 实时同步：每 10 秒自动刷新任务列表
+  useEffect(() => {
+    console.log('🔄 启动自动同步，每 10 秒刷新一次');
+
+    // 立即执行一次刷新
+    handleRefreshAll();
+
+    // 设置定时器，每 10 秒刷新一次
+    const intervalId = setInterval(() => {
+      console.log('⏰ 自动刷新任务列表...');
+      handleRefreshAll();
+    }, 10000); // 10 秒
+
+    // 清理定时器
+    return () => {
+      console.log('🛑 停止自动同步');
+      clearInterval(intervalId);
+    };
+  }, []); // 空依赖数组，只在组件挂载时执行一次
+
   const openCreateModal = () => {
       setEditingTaskId(null);
       setNewTask({ title: '', description: '', productLink: '' });
@@ -1509,13 +1529,18 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
             onClick={handleRefreshAll}
             disabled={refreshing}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            title="刷新所有数据"
+            title="手动刷新（系统每 10 秒自动刷新）"
           >
             <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
           </button>
           <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">System Operational</span>
+              <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                {refreshing ? '同步中...' : '实时同步'}
+              </span>
+              <span className="text-xs text-slate-400">
+                (每 10 秒)
+              </span>
           </div>
         </div>
       </div>
