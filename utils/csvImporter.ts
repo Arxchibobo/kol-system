@@ -28,10 +28,10 @@ export interface ImportResult {
 
 // Tier 映射：CSV 的等级映射到系统等级
 const tierMapping: Record<string, Tier> = {
-  'Mega': Tier.GOLD,
-  'Top': Tier.SILVER,
-  'Mid': Tier.BRONZE,
-  'Micro': Tier.BRONZE,
+  'Mega': Tier.OFFICIAL_COLLABORATOR,
+  'Top': Tier.PREMIUM_INFLUENCER,
+  'Mid': Tier.CORE_PARTNER,
+  'Micro': Tier.CORE_PARTNER,
 };
 
 // Category 映射：CSV 的分类映射到系统标签
@@ -96,7 +96,7 @@ function convertRowToUser(row: CSVRow, index: number): { user: Partial<User> | n
   const email = (row.Email && row.Email !== 'N/A') ? row.Email.trim() : '';
 
   // 获取 Tier
-  const tier = tierMapping[row.Tier] || Tier.BRONZE;
+  const tier = tierMapping[row.Tier] || Tier.CORE_PARTNER;
 
   // 获取标签
   const tags: string[] = [];
@@ -196,9 +196,9 @@ export function generatePreviewData(users: Partial<User>[], limit: number = 10) 
 // 统计各个 Tier 的数量
 export function getTierStats(users: Partial<User>[]) {
   return {
-    gold: users.filter(u => u.tier === Tier.GOLD).length,
-    silver: users.filter(u => u.tier === Tier.SILVER).length,
-    bronze: users.filter(u => u.tier === Tier.BRONZE).length,
+    official: users.filter(u => u.tier === Tier.OFFICIAL_COLLABORATOR).length,
+    premium: users.filter(u => u.tier === Tier.PREMIUM_INFLUENCER).length,
+    core: users.filter(u => u.tier === Tier.CORE_PARTNER).length,
   };
 }
 

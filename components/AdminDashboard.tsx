@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Task, TaskStatus, Settlement, Tier, UserRole } from '../types';
+import { User, Task, TaskStatus, Tier, UserRole, TIER_RATES, WithdrawalRequest, WithdrawalStatus } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload } from 'lucide-react';
+import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload, Settings as SettingsIcon } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -12,13 +12,13 @@ interface Props {
   user: User;
 }
 
-type Tab = 'OVERVIEW' | 'TASKS' | 'AFFILIATES' | 'SETTLEMENTS';
+type Tab = 'OVERVIEW' | 'TASKS' | 'AFFILIATES' | 'WITHDRAWALS';
 
 export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<any[]>([]);
-  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const { t } = useLanguage();
   const { theme } = useTheme();
   
@@ -28,8 +28,18 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   // New Task / Edit Task Form State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [newTask, setNewTask] = useState<Partial<Task>>({ title: '', description: '', productLink: '', rewardRate: 50 });
-  
+  const [newTask, setNewTask] = useState<Partial<Task>>({
+    title: '',
+    description: '',
+    productLink: '',
+    isSpecialReward: false,
+    specialRewards: {
+      CORE_PARTNER: TIER_RATES[Tier.CORE_PARTNER],
+      PREMIUM_INFLUENCER: TIER_RATES[Tier.PREMIUM_INFLUENCER],
+      OFFICIAL_COLLABORATOR: TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
+    }
+  });
+
   // Dedicated form states for complex fields
   const [formDeadline, setFormDeadline] = useState('');
   const [formRequirements, setFormRequirements] = useState('');
@@ -51,6 +61,22 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   // 全局刷新状态
   const [refreshing, setRefreshing] = useState(false);
 
+  // 自动审核规则配置
+  const [showAutoReviewModal, setShowAutoReviewModal] = useState(false);
+  const [autoReviewRules, setAutoReviewRules] = useState({
+    enabled: false,
+    minAmount: 50, // 最低自动通过金额
+    maxAmount: 500, // 最高自动通过金额
+    requireVerifiedAccount: true, // 需要验证过的账号
+    minTasksCompleted: 3, // 至少完成3个任务
+    blacklistCheck: true, // 黑名单检查
+    autoApproveUnder: 100 // 小于此金额自动通过（如果满足其他条件）
+  });
+
+  // 任务参与者状态
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [taskParticipants, setTaskParticipants] = useState<Record<string, any[]>>({});
+
   // 标签分类系统
   const AVAILABLE_TAGS = ['AI博主', '时尚博主', '生活博主', '科技博主', '游戏博主', '美食博主', '旅游博主', '其他'];
   const [selectedTag, setSelectedTag] = useState<string>('全部');
@@ -60,7 +86,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [newKol, setNewKol] = useState<Partial<User>>({
     name: '',
     email: '',
-    tier: Tier.BRONZE,
+    tier: Tier.CORE_PARTNER,
     followerCount: 0,
     tags: [],
     socialLinks: { twitter: '', youtube: '', instagram: '', tiktok: '' }
@@ -109,15 +135,15 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       const taskList = await MockStore.getTasks(user.role);
       console.log('[运营端] 获取到的任务列表:', taskList.length, taskList);
       const s = await MockStore.getStats(user.id, user.role);
-      const sett = await MockStore.getSettlements();
       const aff = await MockStore.getAffiliates();
       const ov = await MockStore.getAdminOverviewStats();
+      const withdrawalList = await MockStore.getAllWithdrawals();
 
       setTasks(taskList);
       setStats(s);
-      setSettlements(sett);
       setAffiliates(aff);
       setOverviewData(ov);
+      setWithdrawals(withdrawalList);
 
       // 获取真实数据
       await fetchRealTotalStats();
@@ -151,14 +177,24 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
   const openCreateModal = () => {
       setEditingTaskId(null);
-      setNewTask({ title: '', description: '', productLink: '', rewardRate: 50 });
-      
+      setNewTask({
+        title: '',
+        description: '',
+        productLink: '',
+        isSpecialReward: false,
+        specialRewards: {
+          CORE_PARTNER: TIER_RATES[Tier.CORE_PARTNER],
+          PREMIUM_INFLUENCER: TIER_RATES[Tier.PREMIUM_INFLUENCER],
+          OFFICIAL_COLLABORATOR: TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
+        }
+      });
+
       // Default deadline: 30 days from now
       const d = new Date();
       d.setDate(d.getDate() + 30);
       setFormDeadline(d.toISOString().split('T')[0]);
       setFormRequirements('');
-      
+
       setShowCreateModal(true);
   };
 
@@ -218,7 +254,17 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setTasks([...updatedTasks]); // Force update
     setShowCreateModal(false);
     setEditingTaskId(null);
-    setNewTask({ title: '', description: '', productLink: '', rewardRate: 50 });
+    setNewTask({
+      title: '',
+      description: '',
+      productLink: '',
+      isSpecialReward: false,
+      specialRewards: {
+        CORE_PARTNER: TIER_RATES[Tier.CORE_PARTNER],
+        PREMIUM_INFLUENCER: TIER_RATES[Tier.PREMIUM_INFLUENCER],
+        OFFICIAL_COLLABORATOR: TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
+      }
+    });
   };
 
   const handleStopTask = async (taskId: string) => {
@@ -393,7 +439,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setNewKol({
         name: '',
         email: '',
-        tier: Tier.BRONZE,
+        tier: Tier.CORE_PARTNER,
         followerCount: 0,
         tags: [],
         socialLinks: { twitter: '', youtube: '', instagram: '', tiktok: '' }
@@ -511,13 +557,43 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     }
   };
 
+  // 切换任务参与者显示
+  const handleToggleParticipants = async (taskId: string) => {
+    const isExpanded = expandedTasks.has(taskId);
+
+    if (isExpanded) {
+      // 收起
+      const newExpanded = new Set(expandedTasks);
+      newExpanded.delete(taskId);
+      setExpandedTasks(newExpanded);
+    } else {
+      // 展开并加载参与者
+      const newExpanded = new Set(expandedTasks);
+      newExpanded.add(taskId);
+      setExpandedTasks(newExpanded);
+
+      // 如果还没加载过，则加载参与者数据
+      if (!taskParticipants[taskId]) {
+        try {
+          const participants = await MockStore.getTaskParticipants(taskId);
+          setTaskParticipants({
+            ...taskParticipants,
+            [taskId]: participants
+          });
+        } catch (error) {
+          console.error('加载参与者失败:', error);
+        }
+      }
+    }
+  };
+
   const renderNav = () => (
     <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit mb-8 transition-colors">
         {[
             { id: 'OVERVIEW', icon: LayoutGrid, label: t('admin.overview') },
             { id: 'TASKS', icon: FileText, label: t('admin.tasks') },
             { id: 'AFFILIATES', icon: Users, label: t('admin.affiliates') },
-            { id: 'SETTLEMENTS', icon: DollarSign, label: t('admin.settlements') },
+            { id: 'WITHDRAWALS', icon: Wallet, label: '提现管理' },
         ].map((item) => (
             <button
                 key={item.id}
@@ -612,21 +688,35 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-            {tasks.map(task => (
-                <div key={task.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{task.title}</h3>
-                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${task.status === TaskStatus.ACTIVE ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                                {task.status}
-                            </span>
+            {tasks.map(task => {
+                const isExpanded = expandedTasks.has(task.id);
+                const participants = taskParticipants[task.id] || [];
+
+                return (
+                <div key={task.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl transition-colors overflow-hidden">
+                    <div className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                                <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{task.title}</h3>
+                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${task.status === TaskStatus.ACTIVE ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                                    {task.status}
+                                </span>
+                            </div>
+                            <p className="text-slate-600 dark:text-slate-400 text-sm max-w-xl">{task.description}</p>
+                            <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
+                                <span>Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
+                                {/* 参与者数量 */}
+                                <button
+                                    onClick={() => handleToggleParticipants(task.id)}
+                                    className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                    <Users size={14} />
+                                    <span>{participants.length || '?'} 位达人参与</span>
+                                    <ChevronRight size={14} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                </button>
+                            </div>
                         </div>
-                        <p className="text-slate-600 dark:text-slate-400 text-sm max-w-xl">{task.description}</p>
-                        <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
-                            <span>Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                          <button
                              onClick={() => handleEditClick(task)}
                              className="p-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -672,8 +762,52 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             />
                         </button>
                     </div>
+                    </div>
+
+                    {/* 参与者列表（展开时显示） */}
+                    {isExpanded && (
+                        <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4">
+                            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">参与的达人</h4>
+                            {participants.length === 0 ? (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">暂无达人参与此任务</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {participants.map((p: any) => (
+                                        <div key={p.affiliateTaskId} className="flex items-center justify-between bg-white dark:bg-slate-900 p-3 rounded-lg">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                                    {p.affiliateName?.charAt(0) || '?'}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-slate-900 dark:text-white">{p.affiliateName}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{p.affiliateEmail}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs">
+                                                <span className={`px-2 py-1 rounded-full font-medium ${
+                                                    p.affiliateTier === 'OFFICIAL_COLLABORATOR' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
+                                                    p.affiliateTier === 'PREMIUM_INFLUENCER' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                                                    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                                }`}>
+                                                    {p.affiliateTier}
+                                                </span>
+                                                <span className="text-slate-500 dark:text-slate-400">{p.totalClicks || 0} clicks</span>
+                                                <span className={`px-2 py-1 rounded-full font-medium ${
+                                                    p.status === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                                    'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                                }`}>
+                                                    {p.status}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
-            ))}
+                );
+            })}
         </div>
 
         {showCreateModal && (
@@ -712,16 +846,90 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">奖励金额 ($/1000次点击)</label>
-                            <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                                value={newTask.rewardRate || 0}
-                                onChange={e => setNewTask({...newTask, rewardRate: parseInt(e.target.value) || 0})}
-                            />
+                        <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-950">
+                            <div className="flex items-center gap-3 mb-3">
+                                <input
+                                    type="checkbox"
+                                    id="specialReward"
+                                    checked={newTask.isSpecialReward || false}
+                                    onChange={e => setNewTask({...newTask, isSpecialReward: e.target.checked})}
+                                    className="w-4 h-4 text-indigo-600 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 rounded focus:ring-indigo-500"
+                                />
+                                <label htmlFor="specialReward" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                    使用特殊奖励金额
+                                </label>
+                            </div>
+
+                            {!newTask.isSpecialReward && (
+                                <div className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
+                                    <p className="font-medium">默认奖励标准:</p>
+                                    <ul className="list-disc list-inside space-y-1 ml-2">
+                                        <li>基础合作伙伴: ${TIER_RATES[Tier.CORE_PARTNER]}/1000点击</li>
+                                        <li>高级影响者: ${TIER_RATES[Tier.PREMIUM_INFLUENCER]}/1000点击</li>
+                                        <li>官方合作者: ${TIER_RATES[Tier.OFFICIAL_COLLABORATOR]}/1000点击</li>
+                                    </ul>
+                                </div>
+                            )}
+
+                            {newTask.isSpecialReward && (
+                                <div className="space-y-3 mt-2">
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">自定义奖励金额 ($/1000次点击):</p>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">基础合作伙伴</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                            value={newTask.specialRewards?.CORE_PARTNER || TIER_RATES[Tier.CORE_PARTNER]}
+                                            onChange={e => setNewTask({
+                                                ...newTask,
+                                                specialRewards: {
+                                                    CORE_PARTNER: parseInt(e.target.value) || 0,
+                                                    PREMIUM_INFLUENCER: newTask.specialRewards?.PREMIUM_INFLUENCER || TIER_RATES[Tier.PREMIUM_INFLUENCER],
+                                                    OFFICIAL_COLLABORATOR: newTask.specialRewards?.OFFICIAL_COLLABORATOR || TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
+                                                }
+                                            })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">高级影响者</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                            value={newTask.specialRewards?.PREMIUM_INFLUENCER || TIER_RATES[Tier.PREMIUM_INFLUENCER]}
+                                            onChange={e => setNewTask({
+                                                ...newTask,
+                                                specialRewards: {
+                                                    CORE_PARTNER: newTask.specialRewards?.CORE_PARTNER || TIER_RATES[Tier.CORE_PARTNER],
+                                                    PREMIUM_INFLUENCER: parseInt(e.target.value) || 0,
+                                                    OFFICIAL_COLLABORATOR: newTask.specialRewards?.OFFICIAL_COLLABORATOR || TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
+                                                }
+                                            })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">官方合作者</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                            value={newTask.specialRewards?.OFFICIAL_COLLABORATOR || TIER_RATES[Tier.OFFICIAL_COLLABORATOR]}
+                                            onChange={e => setNewTask({
+                                                ...newTask,
+                                                specialRewards: {
+                                                    CORE_PARTNER: newTask.specialRewards?.CORE_PARTNER || TIER_RATES[Tier.CORE_PARTNER],
+                                                    PREMIUM_INFLUENCER: newTask.specialRewards?.PREMIUM_INFLUENCER || TIER_RATES[Tier.PREMIUM_INFLUENCER],
+                                                    OFFICIAL_COLLABORATOR: parseInt(e.target.value) || 0
+                                                }
+                                            })}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
@@ -759,44 +967,335 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     </div>
   );
 
-  const renderSettlements = () => (
+  const handleUpdateWithdrawalStatus = async (withdrawalId: string, newStatus: WithdrawalStatus, paymentProof?: string, adminNotes?: string) => {
+    // 找到对应的提现记录，传递完整信息以便后端创建通知
+    const withdrawal = withdrawals.find(w => w.id === withdrawalId);
+    if (withdrawal) {
+      await MockStore.updateWithdrawalStatus(
+        withdrawalId,
+        newStatus,
+        paymentProof,
+        adminNotes,
+        withdrawal.affiliateId,
+        withdrawal.amount,
+        withdrawal.taskTitle
+      );
+    } else {
+      await MockStore.updateWithdrawalStatus(withdrawalId, newStatus, paymentProof, adminNotes);
+    }
+    const updatedWithdrawals = await MockStore.getAllWithdrawals();
+    setWithdrawals(updatedWithdrawals);
+  };
+
+  // 计算提现统计数据
+  const calculateWithdrawalStats = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    // 总提现金额
+    const totalAmount = withdrawals.reduce((sum, w) => sum + w.amount, 0);
+
+    // 已完成提现金额
+    const completedAmount = withdrawals
+      .filter(w => w.status === WithdrawalStatus.COMPLETED)
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    // 待处理金额
+    const pendingAmount = withdrawals
+      .filter(w => w.status === WithdrawalStatus.PENDING || w.status === WithdrawalStatus.PROCESSING)
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    // 本月提现金额
+    const monthlyAmount = withdrawals
+      .filter(w => {
+        const date = new Date(w.requestedAt);
+        return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+      })
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    // 本年提现金额
+    const yearlyAmount = withdrawals
+      .filter(w => {
+        const date = new Date(w.requestedAt);
+        return date.getFullYear() === currentYear;
+      })
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    // 月度统计（最近12个月）
+    const monthlyStats = [];
+    for (let i = 11; i >= 0; i--) {
+      const targetDate = new Date(currentYear, currentMonth - i, 1);
+      const targetYear = targetDate.getFullYear();
+      const targetMonth = targetDate.getMonth();
+
+      const amount = withdrawals
+        .filter(w => {
+          const date = new Date(w.requestedAt);
+          return date.getFullYear() === targetYear && date.getMonth() === targetMonth;
+        })
+        .reduce((sum, w) => sum + w.amount, 0);
+
+      monthlyStats.push({
+        month: `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`,
+        amount: amount,
+        count: withdrawals.filter(w => {
+          const date = new Date(w.requestedAt);
+          return date.getFullYear() === targetYear && date.getMonth() === targetMonth;
+        }).length
+      });
+    }
+
+    return {
+      totalAmount,
+      completedAmount,
+      pendingAmount,
+      monthlyAmount,
+      yearlyAmount,
+      monthlyStats,
+      totalCount: withdrawals.length,
+      completedCount: withdrawals.filter(w => w.status === WithdrawalStatus.COMPLETED).length,
+      pendingCount: withdrawals.filter(w => w.status === WithdrawalStatus.PENDING || w.status === WithdrawalStatus.PROCESSING).length
+    };
+  };
+
+  const renderWithdrawals = () => {
+    const stats = calculateWithdrawalStats();
+
+    return (
     <div className="space-y-6">
+        {/* 统计卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400">总提现金额</span>
+              <DollarSign size={20} className="text-blue-600 dark:text-blue-400" />
+            </div>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.totalAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.totalCount} 笔</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400">已完成金额</span>
+              <CheckCircle size={20} className="text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${stats.completedAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.completedCount} 笔</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400">待处理金额</span>
+              <Activity size={20} className="text-amber-600 dark:text-amber-400" />
+            </div>
+            <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">${stats.pendingAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.pendingCount} 笔</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400">本月提现</span>
+              <BarChart3 size={20} className="text-purple-600 dark:text-purple-400" />
+            </div>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.monthlyAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">本年: ${stats.yearlyAmount.toFixed(2)}</p>
+          </div>
+        </div>
+
+        {/* 月度趋势图 */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">提现趋势（最近12个月）</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={stats.monthlyStats}>
+              <defs>
+                <linearGradient id="withdrawalGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '12px' }} />
+              <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: theme === 'dark' ? '#1e293b' : '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px'
+                }}
+                formatter={(value: number) => [`$${value.toFixed(2)}`, '金额']}
+              />
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke="#10b981"
+                strokeWidth={2}
+                fill="url(#withdrawalGradient)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
         <div className="flex justify-between items-center">
-             <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('admin.financialSettlements')}</h2>
-             <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium">
-                <CheckCircle size={16} /> {t('admin.processPayment')}
-             </button>
+             <h2 className="text-xl font-bold text-slate-900 dark:text-white">提现管理</h2>
+             <div className="flex gap-2">
+               {/* 导出按钮 */}
+               <button
+                 onClick={() => {
+                   // 生成CSV数据
+                   const csvContent = [
+                     ['达人姓名', '任务标题', '金额', '收款方式', '收款详情', '状态', '申请时间', '处理时间', '运营备注'],
+                     ...withdrawals.map(w => [
+                       w.affiliateName,
+                       w.taskTitle,
+                       w.amount.toFixed(2),
+                       w.paymentMethod,
+                       w.paymentDetails,
+                       w.status,
+                       new Date(w.requestedAt).toLocaleString('zh-CN'),
+                       w.processedAt ? new Date(w.processedAt).toLocaleString('zh-CN') : '',
+                       w.adminNotes || ''
+                     ])
+                   ].map(row => row.join(',')).join('\n');
+
+                   // 创建下载链接
+                   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                   const link = document.createElement('a');
+                   link.href = URL.createObjectURL(blob);
+                   link.download = `提现清单_${new Date().toISOString().split('T')[0]}.csv`;
+                   link.click();
+                 }}
+                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+               >
+                 <Upload size={16} /> 导出清单
+               </button>
+
+               {/* 批量打款按钮 */}
+               <button
+                 onClick={() => {
+                   const pendingWithdrawals = withdrawals.filter(w =>
+                     w.status === WithdrawalStatus.PENDING || w.status === WithdrawalStatus.PROCESSING
+                   );
+                   if (pendingWithdrawals.length === 0) {
+                     alert('没有待处理的提现');
+                     return;
+                   }
+                   const confirmed = window.confirm(
+                     `确定要批量处理 ${pendingWithdrawals.length} 笔提现吗？\n` +
+                     `总金额: $${pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}\n\n` +
+                     `所有提现将被标记为"处理中"状态。`
+                   );
+                   if (confirmed) {
+                     // 批量更新状态
+                     Promise.all(
+                       pendingWithdrawals.map(w =>
+                         handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.PROCESSING)
+                       )
+                     ).then(() => {
+                       alert('批量处理完成！');
+                     }).catch(error => {
+                       console.error('批量处理失败:', error);
+                       alert('批量处理失败，请重试');
+                     });
+                   }
+                 }}
+                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+               >
+                 <CheckCircle size={16} /> 批量打款
+               </button>
+
+               {/* 审核规则按钮 */}
+               <button
+                 onClick={() => setShowAutoReviewModal(true)}
+                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+               >
+                 <SettingsIcon size={16} /> 审核规则
+               </button>
+             </div>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden transition-colors">
             <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                        <th className="px-6 py-4 font-medium">{t('admin.tableAffiliate')}</th>
-                        <th className="px-6 py-4 font-medium">{t('admin.tablePeriod')}</th>
-                        <th className="px-6 py-4 font-medium">{t('admin.tableAmount')}</th>
-                        <th className="px-6 py-4 font-medium">{t('admin.tableStatus')}</th>
-                        <th className="px-6 py-4 font-medium">{t('admin.tableTransaction')}</th>
+                        <th className="px-6 py-4 font-medium">达人</th>
+                        <th className="px-6 py-4 font-medium">任务</th>
+                        <th className="px-6 py-4 font-medium">金额</th>
+                        <th className="px-6 py-4 font-medium">收款方式</th>
+                        <th className="px-6 py-4 font-medium">状态</th>
+                        <th className="px-6 py-4 font-medium">申请时间</th>
+                        <th className="px-6 py-4 font-medium">操作</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {settlements.map(s => (
-                        <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{s.affiliateName}</td>
-                            <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{s.period}</td>
-                            <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-mono font-medium">${s.amount.toLocaleString()}</td>
-                            <td className="px-6 py-4">
-                                <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}`}>
-                                    {s.status}
-                                </span>
+                    {withdrawals.length === 0 ? (
+                        <tr>
+                            <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                暂无提现申请
                             </td>
-                            <td className="px-6 py-4 text-slate-500 font-mono text-xs">{s.transactionHash}</td>
                         </tr>
-                    ))}
+                    ) : (
+                        withdrawals.map((w: WithdrawalRequest) => (
+                            <tr key={w.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{w.affiliateName}</td>
+                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{w.taskTitle}</td>
+                                <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-mono font-medium">${w.amount.toFixed(2)}</td>
+                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{w.paymentMethod}</td>
+                                <td className="px-6 py-4">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                        w.status === WithdrawalStatus.COMPLETED ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                        w.status === WithdrawalStatus.PROCESSING ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                                        w.status === WithdrawalStatus.REJECTED ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                                        'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                    }`}>
+                                        {w.status}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
+                                    {new Date(w.requestedAt).toLocaleDateString('zh-CN')}
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex gap-2">
+                                        {w.status === WithdrawalStatus.PENDING && (
+                                            <>
+                                                <button
+                                                    onClick={() => handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.PROCESSING)}
+                                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium"
+                                                >
+                                                    处理中
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const notes = prompt('拒绝原因:');
+                                                        if (notes) handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.REJECTED, undefined, notes);
+                                                    }}
+                                                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium"
+                                                >
+                                                    拒绝
+                                                </button>
+                                            </>
+                                        )}
+                                        {w.status === WithdrawalStatus.PROCESSING && (
+                                            <button
+                                                onClick={() => {
+                                                    const proof = prompt('付款截图URL:');
+                                                    if (proof) handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.COMPLETED, proof);
+                                                }}
+                                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-medium"
+                                            >
+                                                标记完成
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    )}
                 </tbody>
             </table>
         </div>
     </div>
-  );
+    );
+  };
 
   const renderAffiliates = () => {
     // 根据搜索和标签筛选达人
@@ -970,10 +1469,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase 
-                                                ${aff.tier === Tier.GOLD ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' : 
-                                                  aff.tier === Tier.SILVER ? 'bg-slate-200 dark:bg-slate-200/10 text-slate-600 dark:text-slate-300' : 
-                                                  'bg-amber-700/10 text-amber-600 dark:text-amber-600'}`}>
+                                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase
+                                                ${aff.tier === Tier.OFFICIAL_COLLABORATOR ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                                                  aff.tier === Tier.PREMIUM_INFLUENCER ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
+                                                  'bg-blue-500/10 text-blue-600 dark:text-blue-400'}`}>
                                                 {t(tierKey)}
                                             </span>
                                         </td>
@@ -1043,9 +1542,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                                     onChange={(e) => handleUpdateTier(aff, e.target.value as Tier)}
                                                                     className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                                                                 >
-                                                                    <option value={Tier.BRONZE}>{t('admin.tierBronze')}</option>
-                                                                    <option value={Tier.SILVER}>{t('admin.tierSilver')}</option>
-                                                                    <option value={Tier.GOLD}>{t('admin.tierGold')}</option>
+                                                                    <option value={Tier.CORE_PARTNER}>基础合作伙伴 ($50/1000)</option>
+                                                                    <option value={Tier.PREMIUM_INFLUENCER}>高级影响者 ($80/1000)</option>
+                                                                    <option value={Tier.OFFICIAL_COLLABORATOR}>官方合作者 ($100/1000)</option>
                                                                 </select>
                                                             </div>
                                                         </div>
@@ -1201,14 +1700,14 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{t('admin.labelTier')}</label>
-                                    <select 
+                                    <select
                                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                         value={newKol.tier}
                                         onChange={e => setNewKol({...newKol, tier: e.target.value as Tier})}
                                     >
-                                        <option value={Tier.BRONZE}>{t('admin.tierBronze')}</option>
-                                        <option value={Tier.SILVER}>{t('admin.tierSilver')}</option>
-                                        <option value={Tier.GOLD}>{t('admin.tierGold')}</option>
+                                        <option value={Tier.CORE_PARTNER}>基础合作伙伴 ($50/1000)</option>
+                                        <option value={Tier.PREMIUM_INFLUENCER}>高级影响者 ($80/1000)</option>
+                                        <option value={Tier.OFFICIAL_COLLABORATOR}>官方合作者 ($100/1000)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -1431,9 +1930,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                             </td>
                                             <td className="px-4 py-2">
                                                 <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                                                    user.tier === Tier.GOLD ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
-                                                    user.tier === Tier.SILVER ? 'bg-slate-200 dark:bg-slate-200/10 text-slate-600 dark:text-slate-300' :
-                                                    'bg-amber-700/10 text-amber-600 dark:text-amber-600'
+                                                    user.tier === Tier.OFFICIAL_COLLABORATOR ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                                                    user.tier === Tier.PREMIUM_INFLUENCER ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
+                                                    'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                                                 }`}>
                                                     {user.tier}
                                                 </span>
@@ -1543,10 +2042,130 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         {activeTab === 'OVERVIEW' && renderOverview()}
         {activeTab === 'TASKS' && renderTasks()}
         {activeTab === 'AFFILIATES' && renderAffiliates()}
-        {activeTab === 'SETTLEMENTS' && renderSettlements()}
+        {activeTab === 'WITHDRAWALS' && renderWithdrawals()}
       </div>
 
       {/* 异常预警详情模态框 */}
+      {/* 自动审核规则弹窗 */}
+      {showAutoReviewModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAutoReviewModal(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">自动审核规则配置</h2>
+              <button onClick={() => setShowAutoReviewModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* 启用开关 */}
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <h3 className="font-medium text-slate-900 dark:text-white">启用自动审核</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">符合条件的提现将自动通过审核</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoReviewRules.enabled}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, enabled: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* 金额范围 */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-slate-900 dark:text-white">金额范围</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">最低金额 ($)</label>
+                    <input
+                      type="number"
+                      value={autoReviewRules.minAmount}
+                      onChange={(e) => setAutoReviewRules({...autoReviewRules, minAmount: Number(e.target.value)})}
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">最高金额 ($)</label>
+                    <input
+                      type="number"
+                      value={autoReviewRules.maxAmount}
+                      onChange={(e) => setAutoReviewRules({...autoReviewRules, maxAmount: Number(e.target.value)})}
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">小额自动通过 ($)</label>
+                  <input
+                    type="number"
+                    value={autoReviewRules.autoApproveUnder}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, autoApproveUnder: Number(e.target.value)})}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">低于此金额且满足其他条件的提现将自动通过</p>
+                </div>
+              </div>
+
+              {/* 风控条件 */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-slate-900 dark:text-white">风控条件</h3>
+                <div>
+                  <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">最少完成任务数</label>
+                  <input
+                    type="number"
+                    value={autoReviewRules.minTasksCompleted}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, minTasksCompleted: Number(e.target.value)})}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={autoReviewRules.requireVerifiedAccount}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, requireVerifiedAccount: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm text-slate-600 dark:text-slate-400">要求账号已验证</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={autoReviewRules.blacklistCheck}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, blacklistCheck: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm text-slate-600 dark:text-slate-400">启用黑名单检查</span>
+                </label>
+              </div>
+
+              {/* 保存按钮 */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  onClick={() => setShowAutoReviewModal(false)}
+                  className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    // TODO: 保存规则到后端
+                    console.log('保存自动审核规则:', autoReviewRules);
+                    alert('规则已保存！');
+                    setShowAutoReviewModal(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  保存规则
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAnomaliesModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAnomaliesModal(false)}>
             <div className="bg-white dark:bg-slate-900 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>

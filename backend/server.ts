@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, getAllTasks, createTask, updateTask, getTaskById } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, getAllTasks, createTask, updateTask, getTaskById, createWithdrawalRequest, getAllWithdrawalRequests, getWithdrawalRequestsByAffiliate, updateWithdrawalStatus } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -333,6 +333,26 @@ app.get('/api/tasks', async (req, res) => {
     }
 });
 
+// 获取任务的参与达人列表
+app.get('/api/tasks/:taskId/participants', async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        console.log(`[API] 获取任务参与者: ${taskId}`);
+
+        const { getTaskParticipants } = await import('./database.js');
+        const participants = await getTaskParticipants(taskId);
+
+        console.log(`[API] 返回 ${participants.length} 个参与者`);
+        res.json(participants);
+    } catch (error: any) {
+        console.error('[API] 获取任务参与者错误:', error);
+        res.status(500).json({
+            error: '获取参与者失败',
+            message: error.message || '未知错误'
+        });
+    }
+});
+
 // 创建新任务
 app.post('/api/tasks', async (req, res) => {
     try {
@@ -404,6 +424,224 @@ app.delete('/api/tasks/:taskId', async (req, res) => {
             error: 'Failed to delete task',
             message: error.message || '未知错误'
         });
+    }
+});
+
+// 删除/释放达人已领取的任务
+app.delete('/api/affiliate-tasks/:affiliateTaskId', async (req, res) => {
+    try {
+        const { affiliateTaskId } = req.params;
+        console.log(`[API] 释放达人任务请求: ${affiliateTaskId}`);
+
+        const { deleteAffiliateTask } = await import('./database.js');
+        await deleteAffiliateTask(affiliateTaskId);
+
+        console.log(`[API] ✅ 达人任务释放成功: ${affiliateTaskId}`);
+        res.json({
+            success: true,
+            message: '任务释放成功'
+        });
+    } catch (error: any) {
+        console.error('[API] 释放达人任务错误:', error);
+        res.status(500).json({
+            error: '释放任务失败',
+            message: error.message || '未知错误'
+        });
+    }
+});
+
+// ----------------------------------------------------------------------
+// 提现请求 API
+// ----------------------------------------------------------------------
+
+// 创建提现请求
+app.post('/api/withdrawals', async (req, res) => {
+    try {
+        const { affiliateId, affiliateName, affiliateTaskId, taskTitle, amount, paymentMethod, paymentDetails } = req.body;
+        console.log('[API] 创建提现请求:', affiliateName, amount);
+
+        if (!affiliateId || !amount || !paymentMethod || !paymentDetails) {
+            return res.status(400).json({ error: '缺少必要参数' });
+        }
+
+        const withdrawalId = `wd-${Date.now()}`;
+        await createWithdrawalRequest({
+            id: withdrawalId,
+            affiliateId,
+            affiliateName,
+            affiliateTaskId,
+            taskTitle,
+            amount,
+            paymentMethod,
+            paymentDetails
+        });
+
+        console.log(`[API] ✅ 提现请求创建成功: ${withdrawalId}`);
+        res.json({
+            success: true,
+            message: '提现请求已提交，运营侧会在7个工作日内进行处理',
+            withdrawalId
+        });
+    } catch (error: any) {
+        console.error('[API] 创建提现请求失败:', error);
+        res.status(500).json({ error: error.message || '创建提现请求失败' });
+    }
+});
+
+// 获取所有提现请求（运营侧）
+app.get('/api/withdrawals', async (req, res) => {
+    try {
+        console.log('[API] 获取所有提现请求');
+        const withdrawals = await getAllWithdrawalRequests();
+        console.log(`[API] 返回 ${withdrawals.length} 条提现记录`);
+        res.json(withdrawals);
+    } catch (error: any) {
+        console.error('[API] 获取提现请求失败:', error);
+        res.status(500).json({ error: error.message || '获取提现请求失败' });
+    }
+});
+
+// 获取达人的提现记录
+app.get('/api/withdrawals/affiliate/:affiliateId', async (req, res) => {
+    try {
+        const { affiliateId } = req.params;
+        console.log('[API] 获取达人提现记录:', affiliateId);
+        const withdrawals = await getWithdrawalRequestsByAffiliate(affiliateId);
+        console.log(`[API] 返回 ${withdrawals.length} 条提现记录`);
+        res.json(withdrawals);
+    } catch (error: any) {
+        console.error('[API] 获取达人提现记录失败:', error);
+        res.status(500).json({ error: error.message || '获取提现记录失败' });
+    }
+});
+
+// 更新提现状态
+app.put('/api/withdrawals/:withdrawalId/status', async (req, res) => {
+    try {
+        const { withdrawalId } = req.params;
+        const { status, paymentProof, adminNotes, affiliateId, amount, taskTitle } = req.body;
+
+        console.log('[API] 更新提现状态:', withdrawalId, '->', status);
+
+        if (!status) {
+            return res.status(400).json({ error: '缺少状态参数' });
+        }
+
+        await updateWithdrawalStatus(withdrawalId, status, paymentProof, adminNotes);
+
+        // 创建状态变更通知
+        if (affiliateId) {
+            const { createNotification } = await import('./database.js');
+            let notificationTitle = '';
+            let notificationMessage = '';
+            let notificationType = '';
+            let notificationData: any = { amount, withdrawalId, taskTitle };
+
+            if (status === 'PROCESSING') {
+                notificationType = 'WITHDRAWAL_PROCESSING';
+                notificationTitle = '提现申请处理中';
+                notificationMessage = `您的提现申请（${taskTitle}，$${amount}）正在处理中，请耐心等待。`;
+            } else if (status === 'COMPLETED') {
+                notificationType = 'WITHDRAWAL_COMPLETED';
+                notificationTitle = '提现已完成';
+                notificationMessage = `恭喜！您的提现（${taskTitle}，$${amount}）已成功打款，请查收。`;
+                if (paymentProof) {
+                    notificationData.paymentProof = paymentProof;
+                }
+            } else if (status === 'REJECTED') {
+                notificationType = 'WITHDRAWAL_REJECTED';
+                notificationTitle = '提现申请被拒绝';
+                notificationMessage = `抱歉，您的提现申请（${taskTitle}，$${amount}）被拒绝。${adminNotes ? `原因：${adminNotes}` : ''}`;
+                if (adminNotes) {
+                    notificationData.reason = adminNotes;
+                }
+            }
+
+            if (notificationType) {
+                await createNotification({
+                    id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    userId: affiliateId,
+                    type: notificationType,
+                    title: notificationTitle,
+                    message: notificationMessage,
+                    relatedId: withdrawalId,
+                    isRead: false,
+                    data: notificationData
+                });
+                console.log(`[API] ✅ 通知已创建: ${notificationType}`);
+            }
+        }
+
+        console.log(`[API] ✅ 提现状态更新成功: ${withdrawalId}`);
+        res.json({
+            success: true,
+            message: '提现状态更新成功',
+            withdrawalId,
+            status
+        });
+    } catch (error: any) {
+        console.error('[API] 更新提现状态失败:', error);
+        res.status(500).json({ error: error.message || '更新提现状态失败' });
+    }
+});
+
+// ----------------------------------------------------------------------
+// 通知相关 API
+// ----------------------------------------------------------------------
+
+// 获取用户的所有通知
+app.get('/api/notifications/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { getNotificationsByUser } = await import('./database.js');
+        const notifications = await getNotificationsByUser(userId);
+
+        res.json(notifications);
+    } catch (error: any) {
+        console.error('[API] 获取通知失败:', error);
+        res.status(500).json({ error: error.message || '获取通知失败' });
+    }
+});
+
+// 获取未读通知数量
+app.get('/api/notifications/:userId/unread-count', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { getUnreadNotificationCount } = await import('./database.js');
+        const count = await getUnreadNotificationCount(userId);
+
+        res.json({ count });
+    } catch (error: any) {
+        console.error('[API] 获取未读通知数量失败:', error);
+        res.status(500).json({ error: error.message || '获取未读通知数量失败' });
+    }
+});
+
+// 标记通知为已读
+app.put('/api/notifications/:notificationId/read', async (req, res) => {
+    try {
+        const { notificationId } = req.params;
+        const { markNotificationAsRead } = await import('./database.js');
+        await markNotificationAsRead(notificationId);
+
+        res.json({ success: true, message: '通知已标记为已读' });
+    } catch (error: any) {
+        console.error('[API] 标记通知已读失败:', error);
+        res.status(500).json({ error: error.message || '标记通知已读失败' });
+    }
+});
+
+// 标记所有通知为已读
+app.put('/api/notifications/:userId/read-all', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { markAllNotificationsAsRead } = await import('./database.js');
+        await markAllNotificationsAsRead(userId);
+
+        res.json({ success: true, message: '所有通知已标记为已读' });
+    } catch (error: any) {
+        console.error('[API] 标记所有通知已读失败:', error);
+        res.status(500).json({ error: error.message || '标记所有通知已读失败' });
     }
 });
 

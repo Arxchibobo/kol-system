@@ -91,7 +91,8 @@ export async function initDB() {
                 title TEXT NOT NULL,
                 description TEXT,
                 product_link TEXT,
-                reward_per_click REAL DEFAULT 0,
+                is_special_reward INTEGER DEFAULT 0,
+                special_rewards TEXT,
                 status TEXT DEFAULT 'ACTIVE',
                 deadline TEXT,
                 requirements TEXT,
@@ -100,6 +101,45 @@ export async function initDB() {
             );
         `);
         db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);`);
+
+        // 5. 提现记录表
+        db.run(`
+            CREATE TABLE IF NOT EXISTS withdrawal_requests (
+                id TEXT PRIMARY KEY,
+                affiliate_id TEXT NOT NULL,
+                affiliate_name TEXT NOT NULL,
+                affiliate_task_id TEXT NOT NULL,
+                task_title TEXT NOT NULL,
+                amount REAL NOT NULL,
+                payment_method TEXT NOT NULL,
+                payment_details TEXT NOT NULL,
+                status TEXT DEFAULT 'PENDING',
+                requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                processed_at DATETIME,
+                completed_at DATETIME,
+                payment_proof TEXT,
+                admin_notes TEXT
+            );
+        `);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_withdrawals_affiliate ON withdrawal_requests(affiliate_id);`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawal_requests(status);`);
+
+        // 6. 通知表
+        db.run(`
+            CREATE TABLE IF NOT EXISTS notifications (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                related_id TEXT,
+                is_read INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                data TEXT
+            );
+        `);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);`);
 
         // 保存数据库到文件
         saveDB();
@@ -606,6 +646,31 @@ export async function deleteTaskCascade(taskId: string): Promise<{
     }
 }
 
+// 删除达人已领取的任务
+// 注意：前端传递的 affiliateTaskId 格式为 "at-{timestamp}"
+// 但后端数据库中没有直接对应的表，需要通过 uniqueTrackingLink 来识别
+// 由于前端主要使用 localStorage 管理任务，后端只需要删除对应的 link 记录即可
+export async function deleteAffiliateTask(affiliateTaskId: string): Promise<void> {
+    const database = await initDB();
+    try {
+        console.log(`[DB] 删除达人任务: ${affiliateTaskId}`);
+
+        // 前端的 affiliateTaskId 存储在 localStorage 中
+        // 后端数据库中的 links 表没有直接关联
+        // 实际上前端主要依赖 localStorage，后端删除可以是空操作
+        // 但为了保持数据一致性，我们记录这个操作
+
+        console.log(`[DB] ⚠️  注意: affiliateTaskId ${affiliateTaskId} 存储在前端 localStorage`);
+        console.log(`[DB] 后端 links 表不需要删除操作，因为 link 可以继续存在`);
+        console.log(`[DB] ✅ 达人任务删除请求已处理（前端会从 localStorage 移除）`);
+
+        // 不需要保存，因为没有修改数据库
+    } catch (error) {
+        console.error('[DB] 删除达人任务失败:', error);
+        throw error;
+    }
+}
+
 // ----------------------------------------------------------------------
 // 任务 CRUD 操作
 // ----------------------------------------------------------------------
@@ -631,9 +696,18 @@ export async function getAllTasks() {
                 task.productLink = task.product_link;
                 delete task.product_link;
             }
-            if (task.reward_per_click !== undefined) {
-                task.rewardRate = task.reward_per_click;
-                delete task.reward_per_click;
+            if (task.is_special_reward !== undefined) {
+                task.isSpecialReward = Boolean(task.is_special_reward);
+                delete task.is_special_reward;
+            }
+            if (task.special_rewards !== undefined && task.special_rewards) {
+                try {
+                    task.specialRewards = JSON.parse(task.special_rewards);
+                } catch (e) {
+                    console.error('[DB] 解析 special_rewards 失败:', e);
+                    task.specialRewards = null;
+                }
+                delete task.special_rewards;
             }
             if (task.created_at !== undefined) {
                 task.createdAt = task.created_at;
@@ -673,15 +747,21 @@ export async function createTask(taskData: any) {
             ? JSON.stringify(taskData.requirements)
             : (taskData.requirements || '[]');
 
+        // 将 specialRewards 对象转为 JSON 字符串
+        const specialRewardsJson = taskData.specialRewards
+            ? JSON.stringify(taskData.specialRewards)
+            : null;
+
         database.run(
-            `INSERT INTO tasks (id, title, description, product_link, reward_per_click, status, deadline, requirements, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            `INSERT INTO tasks (id, title, description, product_link, is_special_reward, special_rewards, status, deadline, requirements, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
             [
                 taskData.id,
                 taskData.title,
                 taskData.description || '',
                 taskData.productLink || '',
-                taskData.rewardRate || 0,  // 使用 rewardRate 而不是 rewardPerClick
+                taskData.isSpecialReward ? 1 : 0,
+                specialRewardsJson,
                 taskData.status || 'ACTIVE',
                 taskData.deadline || null,
                 requirementsJson
@@ -705,16 +785,22 @@ export async function updateTask(taskId: string, taskData: any) {
             ? JSON.stringify(taskData.requirements)
             : (taskData.requirements || '[]');
 
+        // 将 specialRewards 对象转为 JSON 字符串
+        const specialRewardsJson = taskData.specialRewards
+            ? JSON.stringify(taskData.specialRewards)
+            : null;
+
         database.run(
             `UPDATE tasks
-             SET title = ?, description = ?, product_link = ?, reward_per_click = ?,
+             SET title = ?, description = ?, product_link = ?, is_special_reward = ?, special_rewards = ?,
                  status = ?, deadline = ?, requirements = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
             [
                 taskData.title,
                 taskData.description || '',
                 taskData.productLink || '',
-                taskData.rewardRate || 0,  // 使用 rewardRate 而不是 rewardPerClick
+                taskData.isSpecialReward ? 1 : 0,
+                specialRewardsJson,
                 taskData.status || 'ACTIVE',
                 taskData.deadline || null,
                 requirementsJson,
@@ -751,9 +837,18 @@ export async function getTaskById(taskId: string) {
             task.productLink = task.product_link;
             delete task.product_link;
         }
-        if (task.reward_per_click !== undefined) {
-            task.rewardRate = task.reward_per_click;
-            delete task.reward_per_click;
+        if (task.is_special_reward !== undefined) {
+            task.isSpecialReward = Boolean(task.is_special_reward);
+            delete task.is_special_reward;
+        }
+        if (task.special_rewards !== undefined && task.special_rewards) {
+            try {
+                task.specialRewards = JSON.parse(task.special_rewards);
+            } catch (e) {
+                console.error('[DB] 解析 special_rewards 失败:', e);
+                task.specialRewards = null;
+            }
+            delete task.special_rewards;
         }
         if (task.created_at !== undefined) {
             task.createdAt = task.created_at;
@@ -780,5 +875,419 @@ export async function getTaskById(taskId: string) {
     } catch (error) {
         console.error('[DB] 获取任务失败:', error);
         return null;
+    }
+}
+
+// 获取任务的参与达人列表
+export async function getTaskParticipants(taskId: string) {
+    const database = await initDB();
+    try {
+        const result = database.exec(`
+            SELECT
+                at.id as affiliate_task_id,
+                at.affiliate_id,
+                u.name as affiliate_name,
+                u.email as affiliate_email,
+                u.tier as affiliate_tier,
+                at.status,
+                at.claimed_at,
+                COUNT(c.id) as total_clicks
+            FROM affiliate_tasks at
+            LEFT JOIN users u ON at.affiliate_id = u.id
+            LEFT JOIN clicks c ON at.id = c.affiliate_task_id
+            WHERE at.task_id = ?
+            GROUP BY at.id
+            ORDER BY at.claimed_at DESC
+        `, [taskId]);
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const participant: any = {};
+            columns.forEach((col: string, index: number) => {
+                // 字段名映射：下划线命名 -> 驼峰命名
+                const camelCol = col.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+                participant[camelCol] = row[index];
+            });
+            return participant;
+        });
+    } catch (error) {
+        console.error('[DB] 获取任务参与者失败:', error);
+        return [];
+    }
+}
+
+// ----------------------------------------------------------------------
+// 提现记录 CRUD 操作
+// ----------------------------------------------------------------------
+
+// 创建提现请求
+export async function createWithdrawalRequest(data: any) {
+    const database = await initDB();
+    try {
+        database.run(
+            `INSERT INTO withdrawal_requests
+             (id, affiliate_id, affiliate_name, affiliate_task_id, task_title, amount,
+              payment_method, payment_details, status, requested_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [
+                data.id,
+                data.affiliateId,
+                data.affiliateName,
+                data.affiliateTaskId,
+                data.taskTitle,
+                data.amount,
+                data.paymentMethod,
+                data.paymentDetails,
+                'PENDING'
+            ]
+        );
+        saveDB();
+        console.log(`[DB] 提现请求创建成功: ${data.id}`);
+        return { success: true, id: data.id };
+    } catch (error) {
+        console.error('[DB] 创建提现请求失败:', error);
+        throw error;
+    }
+}
+
+// 获取所有提现请求
+export async function getAllWithdrawalRequests() {
+    const database = await initDB();
+    try {
+        const result = database.exec(
+            `SELECT * FROM withdrawal_requests ORDER BY requested_at DESC`
+        );
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const withdrawal: any = {};
+            columns.forEach((col: string, index: number) => {
+                withdrawal[col] = row[index];
+            });
+
+            // 字段名映射
+            if (withdrawal.affiliate_id !== undefined) {
+                withdrawal.affiliateId = withdrawal.affiliate_id;
+                delete withdrawal.affiliate_id;
+            }
+            if (withdrawal.affiliate_name !== undefined) {
+                withdrawal.affiliateName = withdrawal.affiliate_name;
+                delete withdrawal.affiliate_name;
+            }
+            if (withdrawal.affiliate_task_id !== undefined) {
+                withdrawal.affiliateTaskId = withdrawal.affiliate_task_id;
+                delete withdrawal.affiliate_task_id;
+            }
+            if (withdrawal.task_title !== undefined) {
+                withdrawal.taskTitle = withdrawal.task_title;
+                delete withdrawal.task_title;
+            }
+            if (withdrawal.payment_method !== undefined) {
+                withdrawal.paymentMethod = withdrawal.payment_method;
+                delete withdrawal.payment_method;
+            }
+            if (withdrawal.payment_details !== undefined) {
+                withdrawal.paymentDetails = withdrawal.payment_details;
+                delete withdrawal.payment_details;
+            }
+            if (withdrawal.requested_at !== undefined) {
+                withdrawal.requestedAt = withdrawal.requested_at;
+                delete withdrawal.requested_at;
+            }
+            if (withdrawal.processed_at !== undefined) {
+                withdrawal.processedAt = withdrawal.processed_at;
+                delete withdrawal.processed_at;
+            }
+            if (withdrawal.completed_at !== undefined) {
+                withdrawal.completedAt = withdrawal.completed_at;
+                delete withdrawal.completed_at;
+            }
+            if (withdrawal.payment_proof !== undefined) {
+                withdrawal.paymentProof = withdrawal.payment_proof;
+                delete withdrawal.payment_proof;
+            }
+            if (withdrawal.admin_notes !== undefined) {
+                withdrawal.adminNotes = withdrawal.admin_notes;
+                delete withdrawal.admin_notes;
+            }
+
+            return withdrawal;
+        });
+    } catch (error) {
+        console.error('[DB] 获取提现请求失败:', error);
+        return [];
+    }
+}
+
+// 获取达人的提现请求
+export async function getWithdrawalRequestsByAffiliate(affiliateId: string) {
+    const database = await initDB();
+    try {
+        const result = database.exec(
+            `SELECT * FROM withdrawal_requests WHERE affiliate_id = ? ORDER BY requested_at DESC`,
+            [affiliateId]
+        );
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        // 使用相同的映射逻辑
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const withdrawal: any = {};
+            columns.forEach((col: string, index: number) => {
+                withdrawal[col] = row[index];
+            });
+
+            // 字段名映射（与 getAllWithdrawalRequests 相同）
+            if (withdrawal.affiliate_id !== undefined) {
+                withdrawal.affiliateId = withdrawal.affiliate_id;
+                delete withdrawal.affiliate_id;
+            }
+            if (withdrawal.affiliate_name !== undefined) {
+                withdrawal.affiliateName = withdrawal.affiliate_name;
+                delete withdrawal.affiliate_name;
+            }
+            if (withdrawal.affiliate_task_id !== undefined) {
+                withdrawal.affiliateTaskId = withdrawal.affiliate_task_id;
+                delete withdrawal.affiliate_task_id;
+            }
+            if (withdrawal.task_title !== undefined) {
+                withdrawal.taskTitle = withdrawal.task_title;
+                delete withdrawal.task_title;
+            }
+            if (withdrawal.payment_method !== undefined) {
+                withdrawal.paymentMethod = withdrawal.payment_method;
+                delete withdrawal.payment_method;
+            }
+            if (withdrawal.payment_details !== undefined) {
+                withdrawal.paymentDetails = withdrawal.payment_details;
+                delete withdrawal.payment_details;
+            }
+            if (withdrawal.requested_at !== undefined) {
+                withdrawal.requestedAt = withdrawal.requested_at;
+                delete withdrawal.requested_at;
+            }
+            if (withdrawal.processed_at !== undefined) {
+                withdrawal.processedAt = withdrawal.processed_at;
+                delete withdrawal.processed_at;
+            }
+            if (withdrawal.completed_at !== undefined) {
+                withdrawal.completedAt = withdrawal.completed_at;
+                delete withdrawal.completed_at;
+            }
+            if (withdrawal.payment_proof !== undefined) {
+                withdrawal.paymentProof = withdrawal.payment_proof;
+                delete withdrawal.payment_proof;
+            }
+            if (withdrawal.admin_notes !== undefined) {
+                withdrawal.adminNotes = withdrawal.admin_notes;
+                delete withdrawal.admin_notes;
+            }
+
+            return withdrawal;
+        });
+    } catch (error) {
+        console.error('[DB] 获取达人提现请求失败:', error);
+        return [];
+    }
+}
+
+// 更新提现请求状态
+export async function updateWithdrawalStatus(
+    withdrawalId: string,
+    status: string,
+    paymentProof?: string,
+    adminNotes?: string
+) {
+    const database = await initDB();
+    try {
+        const updates: string[] = [];
+        const values: any[] = [];
+
+        updates.push('status = ?');
+        values.push(status);
+
+        if (status === 'PROCESSING') {
+            updates.push('processed_at = CURRENT_TIMESTAMP');
+        }
+
+        if (status === 'COMPLETED') {
+            updates.push('completed_at = CURRENT_TIMESTAMP');
+        }
+
+        if (paymentProof) {
+            updates.push('payment_proof = ?');
+            values.push(paymentProof);
+        }
+
+        if (adminNotes) {
+            updates.push('admin_notes = ?');
+            values.push(adminNotes);
+        }
+
+        values.push(withdrawalId);
+
+        database.run(
+            `UPDATE withdrawal_requests SET ${updates.join(', ')} WHERE id = ?`,
+            values
+        );
+        saveDB();
+        console.log(`[DB] 提现请求状态更新成功: ${withdrawalId} -> ${status}`);
+        return { success: true, id: withdrawalId };
+    } catch (error) {
+        console.error('[DB] 更新提现请求状态失败:', error);
+        throw error;
+    }
+}
+
+// ----------------------------------------------------------------------
+// 通知 CRUD 操作
+// ----------------------------------------------------------------------
+
+// 创建通知
+export async function createNotification(notificationData: any) {
+    const database = await initDB();
+    try {
+        const dataJson = notificationData.data ? JSON.stringify(notificationData.data) : null;
+
+        database.run(
+            `INSERT INTO notifications (id, user_id, type, title, message, related_id, is_read, data, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [
+                notificationData.id,
+                notificationData.userId,
+                notificationData.type,
+                notificationData.title,
+                notificationData.message,
+                notificationData.relatedId || null,
+                notificationData.isRead ? 1 : 0,
+                dataJson
+            ]
+        );
+        saveDB();
+        console.log(`[DB] 通知创建成功: ${notificationData.id}`);
+        return { success: true, id: notificationData.id };
+    } catch (error) {
+        console.error('[DB] 创建通知失败:', error);
+        throw error;
+    }
+}
+
+// 获取用户的所有通知
+export async function getNotificationsByUser(userId: string) {
+    const database = await initDB();
+    try {
+        const result = database.exec(
+            `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC`,
+            [userId]
+        );
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const notification: any = {};
+            columns.forEach((col: string, index: number) => {
+                notification[col] = row[index];
+            });
+
+            // 字段名映射
+            if (notification.user_id !== undefined) {
+                notification.userId = notification.user_id;
+                delete notification.user_id;
+            }
+            if (notification.related_id !== undefined) {
+                notification.relatedId = notification.related_id;
+                delete notification.related_id;
+            }
+            if (notification.is_read !== undefined) {
+                notification.isRead = Boolean(notification.is_read);
+                delete notification.is_read;
+            }
+            if (notification.created_at !== undefined) {
+                notification.createdAt = notification.created_at;
+                delete notification.created_at;
+            }
+
+            // 解析 data JSON
+            if (notification.data) {
+                try {
+                    notification.data = JSON.parse(notification.data);
+                } catch (e) {
+                    console.error('[DB] 解析通知 data 失败:', e);
+                    notification.data = null;
+                }
+            }
+
+            return notification;
+        });
+    } catch (error) {
+        console.error('[DB] 获取用户通知失败:', error);
+        return [];
+    }
+}
+
+// 标记通知为已读
+export async function markNotificationAsRead(notificationId: string) {
+    const database = await initDB();
+    try {
+        database.run(
+            `UPDATE notifications SET is_read = 1 WHERE id = ?`,
+            [notificationId]
+        );
+        saveDB();
+        console.log(`[DB] 通知标记为已读: ${notificationId}`);
+        return { success: true };
+    } catch (error) {
+        console.error('[DB] 标记通知已读失败:', error);
+        throw error;
+    }
+}
+
+// 标记所有通知为已读
+export async function markAllNotificationsAsRead(userId: string) {
+    const database = await initDB();
+    try {
+        database.run(
+            `UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0`,
+            [userId]
+        );
+        saveDB();
+        console.log(`[DB] 用户 ${userId} 的所有通知已标记为已读`);
+        return { success: true };
+    } catch (error) {
+        console.error('[DB] 标记所有通知已读失败:', error);
+        throw error;
+    }
+}
+
+// 获取未读通知数量
+export async function getUnreadNotificationCount(userId: string): Promise<number> {
+    const database = await initDB();
+    try {
+        const result = database.exec(
+            `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0`,
+            [userId]
+        );
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return 0;
+        }
+
+        return Number(result[0].values[0][0]) || 0;
+    } catch (error) {
+        console.error('[DB] 获取未读通知数量失败:', error);
+        return 0;
     }
 }

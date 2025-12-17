@@ -20,10 +20,10 @@ interface KOLData {
 
 // Tier 映射
 const tierMapping: Record<string, Tier> = {
-  'Mega': Tier.GOLD,
-  'Top': Tier.SILVER,
-  'Mid': Tier.BRONZE,
-  'Micro': Tier.BRONZE,
+  'Mega': Tier.OFFICIAL_COLLABORATOR,
+  'Top': Tier.PREMIUM_INFLUENCER,
+  'Mid': Tier.CORE_PARTNER,
+  'Micro': Tier.CORE_PARTNER,
 };
 
 // 解析粉丝数
@@ -119,7 +119,7 @@ async function parseFirstCSV(): Promise<KOLData[]> {
             if (!row.Name || !row.Handle) return;
 
             const email = (row.Email && row.Email !== 'N/A') ? row.Email.trim() : 'N/A';
-            const tier = tierMapping[row.Tier] || Tier.BRONZE;
+            const tier = tierMapping[row.Tier] || Tier.CORE_PARTNER;
             const followerCount = parseFollowerCount(row.Followers);
 
             // 标签映射
@@ -196,9 +196,9 @@ async function parseSecondCSV(): Promise<KOLData[]> {
             const followerCount = parseFollowerCount(row['粉丝总量'] || 0);
 
             // 根据粉丝数判断 Tier
-            let tier = Tier.BRONZE;
-            if (followerCount >= 1000000) tier = Tier.GOLD;
-            else if (followerCount >= 500000) tier = Tier.SILVER;
+            let tier = Tier.CORE_PARTNER;
+            if (followerCount >= 1000000) tier = Tier.OFFICIAL_COLLABORATOR;
+            else if (followerCount >= 500000) tier = Tier.PREMIUM_INFLUENCER;
 
             // 解析标签
             const tags: string[] = [];
@@ -308,9 +308,9 @@ async function main() {
 
     // 统计信息
     const tierStats = {
-      gold: users.filter(u => u.tier === Tier.GOLD).length,
-      silver: users.filter(u => u.tier === Tier.SILVER).length,
-      bronze: users.filter(u => u.tier === Tier.BRONZE).length,
+      official: users.filter(u => u.tier === Tier.OFFICIAL_COLLABORATOR).length,
+      premium: users.filter(u => u.tier === Tier.PREMIUM_INFLUENCER).length,
+      core: users.filter(u => u.tier === Tier.CORE_PARTNER).length,
     };
 
     console.log('\n📈 统计信息:');

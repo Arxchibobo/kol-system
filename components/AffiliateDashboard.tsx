@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Task, AffiliateTask, Tier, TIER_RATES, TIER_THRESHOLDS } from '../types';
+import { User, Task, AffiliateTask, Tier, TIER_RATES, WithdrawalStatus, Notification } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
+import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw, Wallet, Bell } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -13,7 +13,7 @@ interface Props {
   user: User;
 }
 
-type Tab = 'DASHBOARD' | 'MARKET' | 'MY_TASKS' | 'PROFILE';
+type Tab = 'DASHBOARD' | 'MARKET' | 'MY_TASKS' | 'WITHDRAWALS' | 'PROFILE';
 
 export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const [activeTab, setActiveTab] = useState<Tab>('DASHBOARD');
@@ -38,6 +38,22 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
 
   // 欢迎提示弹窗状态
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
+  // 提现弹窗状态
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [withdrawalTask, setWithdrawalTask] = useState<AffiliateTask | null>(null);
+  const [withdrawalForm, setWithdrawalForm] = useState({
+    paymentMethod: 'PayPal',
+    paymentDetails: ''
+  });
+
+  // 提现记录
+  const [myWithdrawals, setMyWithdrawals] = useState<any[]>([]);
+
+  // 通知系统状态
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
 
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -82,9 +98,13 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     const stats = await statsRes.json();
                     console.log(`[前端] 获取任务 ${task.taskId} 点击统计:`, stats);
 
-                    // 计算预估收益
-                    const tier = refreshedUser?.tier || 'BRONZE';
-                    const rate = TIER_RATES[tier as Tier] || 15;
+                    // 计算预估收益 - 根据任务配置和用户等级
+                    const userTier = refreshedUser?.tier || Tier.CORE_PARTNER;
+                    const taskData = t.find(tsk => tsk.id === task.taskId);
+                    let rate = TIER_RATES[userTier];
+                    if (taskData?.isSpecialReward && taskData?.specialRewards) {
+                        rate = taskData.specialRewards[userTier];
+                    }
                     const estimatedEarnings = (stats.totalClicks * rate) / 1000;
 
                     return {
@@ -118,7 +138,19 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     setMyTasks(updatedMyTasks);
     setStats(s);
 
-      // 4. 检测新任务并显示提醒
+      // 4. 获取我的提现记录
+      const withdrawals = await MockStore.getAffiliateWithdrawals(initialUser.id);
+      setMyWithdrawals(withdrawals);
+      console.log('[达人端] 提现记录:', withdrawals.length, withdrawals);
+
+      // 5. 获取通知和未读数量
+      const notifs = await MockStore.getNotifications(initialUser.id);
+      const unread = await MockStore.getUnreadNotificationCount(initialUser.id);
+      setNotifications(notifs);
+      setUnreadCount(unread);
+      console.log('[达人端] 通知:', notifs.length, '未读:', unread);
+
+      // 6. 检测新任务并显示提醒
       if (refreshedUser) {
         const lastSeen = refreshedUser.lastSeenTaskTimestamp || '1970-01-01';
         const newTasks = available.filter(task => task.createdAt > lastSeen);
@@ -230,13 +262,68 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   };
   
   const handleGiveUp = async (affTaskId: string) => {
-      if (window.confirm(t('affiliate.confirmGiveUp'))) {
-          await MockStore.giveUpTask(affTaskId);
-          // Reload data to refresh Available Tasks list（不阻塞UI）
-          loadData().catch(err => {
-            console.error('[前端] 放弃任务后刷新数据失败:', err);
-          });
+      if (window.confirm('确定要放弃这个任务吗？此操作不可撤销。')) {
+          try {
+            await MockStore.releaseTask(affTaskId);
+            alert('任务已成功释放');
+            // 重新加载数据以刷新可用任务列表
+            await loadData();
+          } catch (error: any) {
+            console.error('[前端] 放弃任务失败:', error);
+            alert('放弃任务失败: ' + error.message);
+          }
       }
+  };
+
+  // 获取任务的奖励金额（根据用户等级和任务配置）
+  const getTaskRewardRate = (task: Task): number => {
+    const userTier = dashboardUser.tier || Tier.CORE_PARTNER;
+
+    // 如果任务有特殊奖励配置，使用特殊奖励
+    if (task.isSpecialReward && task.specialRewards) {
+      const specialReward = task.specialRewards[userTier];
+      if (specialReward !== undefined && specialReward !== null) {
+        return specialReward;
+      }
+    }
+
+    // 否则使用默认等级奖励
+    const defaultRate = TIER_RATES[userTier];
+    return defaultRate !== undefined ? defaultRate : 50; // 确保总是返回一个数字，默认50
+  };
+
+  // 打开提现弹窗
+  const handleOpenWithdrawal = (task: AffiliateTask) => {
+    setWithdrawalTask(task);
+    setShowWithdrawalModal(true);
+  };
+
+  // 提交提现申请
+  const handleSubmitWithdrawal = async () => {
+    if (!withdrawalTask) return;
+
+    try {
+      const taskDef = allTasks.find(t => t.id === withdrawalTask.taskId);
+      await MockStore.createWithdrawalRequest({
+        affiliateId: dashboardUser.id,
+        affiliateName: dashboardUser.name,
+        affiliateTaskId: withdrawalTask.id,
+        taskTitle: taskDef?.title || 'Unknown Task',
+        amount: withdrawalTask.stats.estimatedEarnings,
+        paymentMethod: withdrawalForm.paymentMethod,
+        paymentDetails: withdrawalForm.paymentDetails
+      });
+
+      alert('提现申请已提交，请等待审核');
+      setShowWithdrawalModal(false);
+      setWithdrawalForm({ paymentMethod: 'PayPal', paymentDetails: '' });
+
+      // 重新加载提现记录
+      const withdrawals = await MockStore.getAffiliateWithdrawals(dashboardUser.id);
+      setMyWithdrawals(withdrawals);
+    } catch (error: any) {
+      alert(error?.message || '提现申请失败，请重试');
+    }
   };
 
   const handleSubmitLink = async (affTaskId: string, link: string) => {
@@ -414,6 +501,124 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     }
   };
 
+  // 通知处理函数
+  const handleMarkNotificationAsRead = async (notificationId: string) => {
+    try {
+      await MockStore.markNotificationAsRead(notificationId);
+      // 更新本地状态
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('标记通知已读失败:', error);
+    }
+  };
+
+  const handleMarkAllNotificationsAsRead = async () => {
+    try {
+      await MockStore.markAllNotificationsAsRead(dashboardUser.id);
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('标记所有通知已读失败:', error);
+    }
+  };
+
+
+  // 渲染通知面板
+  const renderNotificationPanel = () => {
+    if (!showNotificationPanel) return null;
+
+    return (
+      <div className="fixed top-20 right-4 w-96 max-h-[600px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden">
+        {/* 头部 */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <Bell size={18} className="text-slate-600 dark:text-slate-400" />
+            <h3 className="font-bold text-slate-900 dark:text-white">通知中心</h3>
+            {unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                {unreadCount}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllNotificationsAsRead}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                全部已读
+              </button>
+            )}
+            <button
+              onClick={() => setShowNotificationPanel(false)}
+              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+            >
+              <X size={16} className="text-slate-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* 通知列表 */}
+        <div className="overflow-y-auto max-h-[500px]">
+          {notifications.length === 0 ? (
+            <div className="p-8 text-center">
+              <Bell size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-700" />
+              <p className="text-slate-500 dark:text-slate-400 text-sm">暂无通知</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200 dark:divide-slate-800">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  onClick={() => {
+                    if (!notification.isRead) {
+                      handleMarkNotificationAsRead(notification.id);
+                    }
+                  }}
+                  className={`p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
+                    !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/10' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-1 p-2 rounded-full ${
+                      notification.type === 'WITHDRAWAL_COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                      notification.type === 'WITHDRAWAL_PROCESSING' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                      notification.type === 'WITHDRAWAL_REJECTED' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                      'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {notification.type === 'WITHDRAWAL_COMPLETED' ? <CheckCircle size={16} /> :
+                       notification.type === 'WITHDRAWAL_PROCESSING' ? <Loader2 size={16} /> :
+                       notification.type === 'WITHDRAWAL_REJECTED' ? <X size={16} /> :
+                       <Bell size={16} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="font-medium text-slate-900 dark:text-white text-sm">
+                          {notification.title}
+                        </h4>
+                        {!notification.isRead && (
+                          <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        {new Date(notification.createdAt).toLocaleString('zh-CN')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderNav = () => (
     <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit mb-8 transition-colors">
@@ -421,6 +626,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
             { id: 'DASHBOARD', icon: LayoutGrid, label: t('affiliate.dashboard') },
             { id: 'MARKET', icon: Target, label: t('affiliate.market') },
             { id: 'MY_TASKS', icon: BarChart3, label: t('affiliate.myTasks') },
+            { id: 'WITHDRAWALS', icon: Wallet, label: '提现记录' },
             { id: 'PROFILE', icon: SettingsIcon, label: t('affiliate.profile') },
         ].map((item) => (
             <button
@@ -452,13 +658,28 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                         {t(tierKey)}
                     </div>
                     <p className="text-sm text-slate-500 mt-2">
-                        {t('affiliate.earnRate', { rate: TIER_RATES[dashboardUser.tier || Tier.BRONZE] })}
+                        {t('affiliate.earnRate', { rate: TIER_RATES[dashboardUser.tier || Tier.CORE_PARTNER] })}
                     </p>
                 </div>
                 <div className="text-right">
                     <p className="text-slate-400 text-sm">{t('affiliate.nextSettlement')}</p>
                     <p className="text-2xl font-bold text-white mb-2">${dashboardUser.pendingEarnings?.toFixed(2) || '0.00'}</p>
-                    <button className="bg-white text-slate-900 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors">
+                    {/* 提现门槛提示 */}
+                    {(dashboardUser.pendingEarnings || 0) < 50 && (
+                        <div className="mb-2 text-xs text-amber-400 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            <span>还需 ${(50 - (dashboardUser.pendingEarnings || 0)).toFixed(2)} 达到提现门槛</span>
+                        </div>
+                    )}
+                    <button
+                        disabled={(dashboardUser.pendingEarnings || 0) < 50}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                            (dashboardUser.pendingEarnings || 0) >= 50
+                                ? 'bg-white text-slate-900 hover:bg-slate-200'
+                                : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                        }`}
+                        title={(dashboardUser.pendingEarnings || 0) < 50 ? '最低提现金额为 $50' : ''}
+                    >
                         {t('affiliate.requestWithdrawal')}
                     </button>
                 </div>
@@ -570,8 +791,21 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 line-clamp-3">{task.description}</p>
                     
                     <div className="space-y-2 mb-6">
-                        <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                            <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/> {t('affiliate.baseReward', { rate: task.rewardRate || 0 })}
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center text-slate-700 dark:text-slate-300">
+                                <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/>
+                                <span>您的奖励</span>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                    ${getTaskRewardRate(task)}<span className="text-xs text-slate-500">/1000 clicks</span>
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {dashboardUser.tier === Tier.OFFICIAL_COLLABORATOR ? '官方合作者' :
+                                     dashboardUser.tier === Tier.PREMIUM_INFLUENCER ? '高级影响者' :
+                                     '核心伙伴'} 等级
+                                </p>
+                            </div>
                         </div>
                         <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
                             <Target size={14} className="mr-2 text-indigo-600 dark:text-indigo-400"/> {t('affiliate.requirements', { count: task.requirements?.length || 0 })}
@@ -711,6 +945,22 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                                 <p className="text-xs text-slate-500">{t('affiliate.conversion')}</p>
                                 <p className="text-sm font-mono text-slate-600 dark:text-slate-300">{(at.stats.conversionRate * 100).toFixed(1)}%</p>
                              </div>
+
+                             {/* Withdrawal Button */}
+                             {at.submittedPostLink && at.stats.estimatedEarnings >= 50 && (
+                                 <button
+                                     onClick={() => handleOpenWithdrawal(at)}
+                                     className="w-full mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                                 >
+                                     <DollarSign size={16} />
+                                     申请提现
+                                 </button>
+                             )}
+                             {at.submittedPostLink && at.stats.estimatedEarnings < 50 && (
+                                 <p className="text-xs text-slate-500 text-center mt-2">
+                                     最低提现金额: $50
+                                 </p>
+                             )}
                         </div>
                     </div>
                 </div>
@@ -726,17 +976,116 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
             <h1 className="text-3xl font-bold mb-2 text-slate-900 dark:text-white">{t('common.welcome')}, {dashboardUser.name}</h1>
             <p className="text-slate-500 dark:text-slate-400">Track your impact and grow your earnings.</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('affiliate.systemOperational')}</span>
+        <div className="flex items-center gap-4">
+          {/* 通知铃铛 */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+              className="relative p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+            >
+              <Bell size={20} className="text-slate-600 dark:text-slate-400" />
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('affiliate.systemOperational')}</span>
+          </div>
         </div>
       </div>
+
+      {/* 通知面板 */}
+      {renderNotificationPanel()}
 
       {renderNav()}
 
       {activeTab === 'DASHBOARD' && renderDashboard()}
       {activeTab === 'MARKET' && renderMarket()}
       {activeTab === 'MY_TASKS' && renderMyTasks()}
+      {activeTab === 'WITHDRAWALS' && (
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">我的提现记录</h2>
+
+          {myWithdrawals.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center">
+              <Wallet size={48} className="mx-auto mb-4 text-slate-400" />
+              <p className="text-slate-500 dark:text-slate-400">暂无提现记录</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">完成任务并达到最低提现金额后即可申请提现</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {myWithdrawals.map((withdrawal: any) => (
+                <div key={withdrawal.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 transition-colors">
+                  <div className="flex flex-col md:flex-row justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-bold text-slate-900 dark:text-white">{withdrawal.taskTitle}</h3>
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                          withdrawal.status === WithdrawalStatus.COMPLETED ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                          withdrawal.status === WithdrawalStatus.PROCESSING ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                          withdrawal.status === WithdrawalStatus.REJECTED ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                          'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        }`}>
+                          {withdrawal.status === WithdrawalStatus.COMPLETED ? '已完成' :
+                           withdrawal.status === WithdrawalStatus.PROCESSING ? '处理中' :
+                           withdrawal.status === WithdrawalStatus.REJECTED ? '已拒绝' : '待审核'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-slate-500 dark:text-slate-400">提现金额</p>
+                          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">${withdrawal.amount.toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 dark:text-slate-400">收款方式</p>
+                          <p className="text-slate-900 dark:text-white">{withdrawal.paymentMethod}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 dark:text-slate-400">申请时间</p>
+                          <p className="text-slate-900 dark:text-white">{new Date(withdrawal.requestedAt).toLocaleString('zh-CN')}</p>
+                        </div>
+                        {withdrawal.completedAt && (
+                          <div>
+                            <p className="text-slate-500 dark:text-slate-400">完成时间</p>
+                            <p className="text-slate-900 dark:text-white">{new Date(withdrawal.completedAt).toLocaleString('zh-CN')}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {withdrawal.status === WithdrawalStatus.REJECTED && withdrawal.adminNotes && (
+                        <div className="mt-4 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+                          <p className="text-xs text-red-700 dark:text-red-400 font-medium mb-1">拒绝原因：</p>
+                          <p className="text-sm text-red-800 dark:text-red-300">{withdrawal.adminNotes}</p>
+                        </div>
+                      )}
+
+                      {withdrawal.status === WithdrawalStatus.COMPLETED && withdrawal.paymentProof && (
+                        <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                          <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mb-2">✓ 已打款</p>
+                          <a
+                            href={withdrawal.paymentProof}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                          >
+                            查看付款截图 <ExternalLink size={14} />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {activeTab === 'PROFILE' && (
           <div className="max-w-4xl space-y-6">
               <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">{t('affiliate.profileSettings')}</h2>
@@ -1100,6 +1449,82 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
           userName={dashboardUser.name}
           onClose={handleCloseWelcome}
         />
+      )}
+
+      {/* Withdrawal Modal */}
+      {showWithdrawalModal && withdrawalTask && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowWithdrawalModal(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">申请提现</h2>
+              <button onClick={() => setShowWithdrawalModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">任务</p>
+                <p className="font-medium text-slate-900 dark:text-white">{allTasks.find(t => t.id === withdrawalTask.taskId)?.title}</p>
+              </div>
+
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <p className="text-sm text-emerald-700 dark:text-emerald-400 mb-1">提现金额</p>
+                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${withdrawalTask.stats.estimatedEarnings.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">收款方式</label>
+                <select
+                  value={withdrawalForm.paymentMethod}
+                  onChange={(e) => setWithdrawalForm({ ...withdrawalForm, paymentMethod: e.target.value })}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="PayPal">PayPal</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Crypto (USDT-TRC20)">Crypto (USDT-TRC20)</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  收款账号
+                  <span className="text-xs text-slate-500 ml-2">(邮箱/账号/地址)</span>
+                </label>
+                <input
+                  type="text"
+                  value={withdrawalForm.paymentDetails}
+                  onChange={(e) => setWithdrawalForm({ ...withdrawalForm, paymentDetails: e.target.value })}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="请输入收款账号"
+                />
+              </div>
+
+              <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <p className="text-xs text-yellow-800 dark:text-yellow-400">
+                  ⚠️ 提现申请提交后，运营团队将在 1-3 个工作日内处理。请确保收款信息准确无误。
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowWithdrawalModal(false)}
+                className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-lg font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSubmitWithdrawal}
+                disabled={!withdrawalForm.paymentDetails}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg font-medium"
+              >
+                确认提现
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

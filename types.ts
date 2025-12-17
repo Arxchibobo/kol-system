@@ -5,9 +5,9 @@ export enum UserRole {
 }
 
 export enum Tier {
-  BRONZE = 'BRONZE',
-  SILVER = 'SILVER',
-  GOLD = 'GOLD'
+  CORE_PARTNER = 'CORE_PARTNER',           // 基础合作伙伴
+  PREMIUM_INFLUENCER = 'PREMIUM_INFLUENCER', // 高级影响者
+  OFFICIAL_COLLABORATOR = 'OFFICIAL_COLLABORATOR' // 官方合作者
 }
 
 export enum TaskStatus {
@@ -19,6 +19,13 @@ export enum TaskStatus {
 export enum SettlementStatus {
   PENDING = 'PENDING',
   PAID = 'PAID'
+}
+
+export enum WithdrawalStatus {
+  PENDING = 'PENDING',       // 待处理
+  PROCESSING = 'PROCESSING', // 处理中
+  COMPLETED = 'COMPLETED',   // 已完成
+  REJECTED = 'REJECTED'      // 已拒绝
 }
 
 export interface User {
@@ -59,7 +66,12 @@ export interface Task {
   title: string;
   description: string;
   productLink: string;
-  rewardRate: number; // e.g., 50 (dollars per 1000 clicks)
+  isSpecialReward: boolean; // Whether using custom special rewards or default TIER_RATES
+  specialRewards?: {
+    CORE_PARTNER: number;
+    PREMIUM_INFLUENCER: number;
+    OFFICIAL_COLLABORATOR: number;
+  }; // Custom reward rates per tier (dollars per 1000 clicks)
   status: TaskStatus;
   createdAt: string;
   deadline: string;
@@ -93,14 +105,58 @@ export interface Settlement {
   date: string;
 }
 
+// 提现记录
+export interface WithdrawalRequest {
+  id: string;
+  affiliateId: string;
+  affiliateName: string;
+  affiliateTaskId: string;        // 关联的任务ID
+  taskTitle: string;              // 任务标题
+  amount: number;                 // 提现金额
+  paymentMethod: string;          // 收款方式 (PayPal, Bank Transfer, Crypto, etc.)
+  paymentDetails: string;         // 收款详情 (账号、地址等)
+  status: WithdrawalStatus;       // 提现状态
+  requestedAt: string;            // 提交时间
+  processedAt?: string;           // 处理时间
+  completedAt?: string;           // 完成时间
+  paymentProof?: string;          // 付款截图URL
+  adminNotes?: string;            // 运营备注
+}
+
+// 达人等级对应的奖励金额（美元/千次点击）
 export const TIER_RATES = {
-  [Tier.BRONZE]: 50,
-  [Tier.SILVER]: 80,
-  [Tier.GOLD]: 100
+  [Tier.CORE_PARTNER]: 50,           // 基础合作伙伴: $50/1000次点击
+  [Tier.PREMIUM_INFLUENCER]: 80,     // 高级影响者: $80/1000次点击
+  [Tier.OFFICIAL_COLLABORATOR]: 100  // 官方合作者: $100/1000次点击
 };
 
-export const TIER_THRESHOLDS = {
-  [Tier.BRONZE]: 0,
-  [Tier.SILVER]: 10000, // clicks
-  [Tier.GOLD]: 50000  // clicks
+// 达人等级的中英文显示名称
+export const TIER_LABELS = {
+  [Tier.CORE_PARTNER]: { zh: '基础合作伙伴', en: 'Core Partner' },
+  [Tier.PREMIUM_INFLUENCER]: { zh: '高级影响者', en: 'Premium Influencer' },
+  [Tier.OFFICIAL_COLLABORATOR]: { zh: '官方合作者', en: 'Official Collaborator' }
 };
+
+// 通知类型
+export enum NotificationType {
+  WITHDRAWAL_SUBMITTED = 'WITHDRAWAL_SUBMITTED',     // 提现申请已提交
+  WITHDRAWAL_PROCESSING = 'WITHDRAWAL_PROCESSING',   // 提现处理中
+  WITHDRAWAL_COMPLETED = 'WITHDRAWAL_COMPLETED',     // 提现已完成
+  WITHDRAWAL_REJECTED = 'WITHDRAWAL_REJECTED',       // 提现被拒绝
+  TASK_ASSIGNED = 'TASK_ASSIGNED',                   // 新任务分配
+  TASK_VERIFIED = 'TASK_VERIFIED',                   // 任务审核通过
+  TIER_UPGRADED = 'TIER_UPGRADED'                    // 等级提升
+}
+
+// 通知接口
+export interface Notification {
+  id: string;
+  userId: string;                    // 接收通知的用户ID
+  type: NotificationType;            // 通知类型
+  title: string;                     // 通知标题
+  message: string;                   // 通知内容
+  relatedId?: string;                // 相关对象ID（如提现ID、任务ID）
+  isRead: boolean;                   // 是否已读
+  createdAt: string;                 // 创建时间
+  data?: any;                        // 额外数据（如金额、付款截图链接等）
+}

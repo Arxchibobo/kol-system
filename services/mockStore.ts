@@ -206,7 +206,7 @@ export const MockStore = {
         email: data.email,
         role: UserRole.AFFILIATE,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`,
-        tier: Tier.BRONZE,
+        tier: Tier.CORE_PARTNER, // 默认设置为基础合作伙伴
         totalEarnings: 0,
         pendingEarnings: 0,
         totalClicks: 0,
@@ -318,7 +318,7 @@ export const MockStore = {
           email: email,
           role: UserRole.AFFILIATE,
           avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'U')}&background=random`,
-          tier: userData.tier || Tier.BRONZE,
+          tier: userData.tier || Tier.CORE_PARTNER,
           totalEarnings: userData.totalEarnings || 0,
           pendingEarnings: userData.pendingEarnings || 0,
           totalClicks: userData.totalClicks || 0,
@@ -466,6 +466,34 @@ export const MockStore = {
     return newAT;
   },
 
+  // 删除/释放已领取的任务
+  releaseTask: async (affiliateTaskId: string): Promise<void> => {
+    try {
+      console.log('[MockStore] 释放任务:', affiliateTaskId);
+      const response = await fetch(`/api/affiliate-tasks/${affiliateTaskId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '释放任务失败');
+      }
+
+      // 从本地数组中移除
+      const index = MOCK_AFFILIATE_TASKS.findIndex(at => at.id === affiliateTaskId);
+      if (index !== -1) {
+        MOCK_AFFILIATE_TASKS.splice(index, 1);
+        saveData();
+      }
+
+      console.log('[MockStore] ✅ 任务释放成功');
+    } catch (error: any) {
+      console.error('[MockStore] 释放任务失败:', error);
+      throw error;
+    }
+  },
+
   // Handle client-side redirection for fallback links
   handleClientRedirect: async (path: string): Promise<string | null> => {
       // Logic: 
@@ -513,7 +541,7 @@ export const MockStore = {
                   if (user) {
                       user.totalClicks = (user.totalClicks || 0) + 1;
                       user.validClicks = (user.validClicks || 0) + 1;
-                      const rate = TIER_RATES[user.tier || Tier.BRONZE];
+                      const rate = TIER_RATES[user.tier || Tier.CORE_PARTNER];
                       const earning = rate / 1000;
                       user.totalEarnings = (user.totalEarnings || 0) + earning;
                       user.pendingEarnings = (user.pendingEarnings || 0) + earning;
@@ -564,7 +592,7 @@ export const MockStore = {
             if (user) {
                 user.totalClicks = (user.totalClicks || 0) + 1;
                 user.validClicks = (user.validClicks || 0) + 1;
-                const rate = TIER_RATES[user.tier || Tier.BRONZE];
+                const rate = TIER_RATES[user.tier || Tier.CORE_PARTNER];
                 user.totalEarnings = (user.totalEarnings || 0) + (rate / 1000);
                 user.pendingEarnings = (user.pendingEarnings || 0) + (rate / 1000);
                 affTask.stats.estimatedEarnings += (rate / 1000);
@@ -581,6 +609,22 @@ export const MockStore = {
       task.submittedPostLink = link;
       task.status = 'SUBMITTED';
       saveData();
+    }
+  },
+
+  // 获取任务的参与达人列表
+  getTaskParticipants: async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/participants`);
+      if (!response.ok) {
+        throw new Error('获取任务参与者失败');
+      }
+      const participants = await response.json();
+      console.log('[MockStore] 获取任务参与者:', participants.length);
+      return participants;
+    } catch (error: any) {
+      console.error('[MockStore] 获取任务参与者失败:', error);
+      return [];
     }
   },
 
@@ -800,6 +844,191 @@ export const MockStore = {
       user.notificationSettings = settings;
       saveData();
       console.log(`[MockStore] 更新用户 ${userId} 通知设置:`, settings);
+    }
+  },
+
+  // ----------------------------------------------------------------------
+  // 提现相关方法
+  // ----------------------------------------------------------------------
+
+  // 创建提现请求
+  createWithdrawalRequest: async (data: {
+    affiliateId: string;
+    affiliateName: string;
+    affiliateTaskId: string;
+    taskTitle: string;
+    amount: number;
+    paymentMethod: string;
+    paymentDetails: string;
+  }) => {
+    try {
+      console.log('[MockStore] 创建提现请求:', data);
+      const response = await fetch('/api/withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '创建提现请求失败');
+      }
+
+      const result = await response.json();
+      console.log('[MockStore] ✅ 提现请求创建成功:', result);
+      return result;
+    } catch (error: any) {
+      console.error('[MockStore] 创建提现请求失败:', error);
+      throw error;
+    }
+  },
+
+  // 获取所有提现请求（运营侧）
+  getAllWithdrawals: async () => {
+    try {
+      const response = await fetch('/api/withdrawals');
+      if (!response.ok) {
+        throw new Error('获取提现请求失败');
+      }
+      const withdrawals = await response.json();
+      console.log('[MockStore] 获取到提现请求:', withdrawals.length);
+      return withdrawals;
+    } catch (error: any) {
+      console.error('[MockStore] 获取提现请求失败:', error);
+      return [];
+    }
+  },
+
+  // 获取达人的提现记录
+  getAffiliateWithdrawals: async (affiliateId: string) => {
+    try {
+      const response = await fetch(`/api/withdrawals/affiliate/${affiliateId}`);
+      if (!response.ok) {
+        throw new Error('获取提现记录失败');
+      }
+      const withdrawals = await response.json();
+      console.log('[MockStore] 获取达人提现记录:', withdrawals.length);
+      return withdrawals;
+    } catch (error: any) {
+      console.error('[MockStore] 获取达人提现记录失败:', error);
+      return [];
+    }
+  },
+
+  // 更新提现状态
+  updateWithdrawalStatus: async (
+    withdrawalId: string,
+    status: string,
+    paymentProof?: string,
+    adminNotes?: string,
+    affiliateId?: string,
+    amount?: number,
+    taskTitle?: string
+  ) => {
+    try {
+      console.log('[MockStore] 更新提现状态:', withdrawalId, '->', status);
+      const response = await fetch(`/api/withdrawals/${withdrawalId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, paymentProof, adminNotes, affiliateId, amount, taskTitle })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '更新提现状态失败');
+      }
+
+      const result = await response.json();
+      console.log('[MockStore] ✅ 提现状态更新成功:', result);
+      return result;
+    } catch (error: any) {
+      console.error('[MockStore] 更新提现状态失败:', error);
+      throw error;
+    }
+  },
+
+  // 更新达人等级（运营侧）
+  updateAffiliateTier: async (userId: string, tier: string) => {
+    try {
+      console.log('[MockStore] 更新达人等级:', userId, '->', tier);
+
+      // 更新本地用户对象
+      const user = MOCK_AFFILIATES.find(u => u.id === userId);
+      if (user) {
+        user.tier = tier as any;
+      }
+
+      // 同步到数据库
+      await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, tier })
+      });
+
+      saveData();
+      console.log('[MockStore] ✅ 达人等级更新成功');
+    } catch (error: any) {
+      console.error('[MockStore] 更新达人等级失败:', error);
+      throw error;
+    }
+  },
+
+  // ----------------------------------------------------------------------
+  // 通知相关方法
+  // ----------------------------------------------------------------------
+
+  // 获取用户通知
+  getNotifications: async (userId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${userId}`);
+      if (!response.ok) throw new Error('获取通知失败');
+      const notifications = await response.json();
+      console.log('[MockStore] 获取通知:', notifications.length);
+      return notifications;
+    } catch (error: any) {
+      console.error('[MockStore] 获取通知失败:', error);
+      throw error;
+    }
+  },
+
+  // 获取未读通知数量
+  getUnreadNotificationCount: async (userId: string): Promise<number> => {
+    try {
+      const response = await fetch(`/api/notifications/${userId}/unread-count`);
+      if (!response.ok) throw new Error('获取未读通知数量失败');
+      const { count } = await response.json();
+      return count;
+    } catch (error: any) {
+      console.error('[MockStore] 获取未读通知数量失败:', error);
+      return 0;
+    }
+  },
+
+  // 标记通知为已读
+  markNotificationAsRead: async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+        method: 'PUT'
+      });
+      if (!response.ok) throw new Error('标记通知已读失败');
+      console.log('[MockStore] 通知已标记为已读:', notificationId);
+    } catch (error: any) {
+      console.error('[MockStore] 标记通知已读失败:', error);
+      throw error;
+    }
+  },
+
+  // 标记所有通知为已读
+  markAllNotificationsAsRead: async (userId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${userId}/read-all`, {
+        method: 'PUT'
+      });
+      if (!response.ok) throw new Error('标记所有通知已读失败');
+      console.log('[MockStore] 所有通知已标记为已读');
+    } catch (error: any) {
+      console.error('[MockStore] 标记所有通知已读失败:', error);
+      throw error;
     }
   }
 };
