@@ -333,6 +333,26 @@ app.get('/api/tasks', async (req, res) => {
     }
 });
 
+// 获取任务的参与达人列表
+app.get('/api/tasks/:taskId/participants', async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        console.log(`[API] 获取任务参与者: ${taskId}`);
+
+        const { getTaskParticipants } = await import('./database.js');
+        const participants = await getTaskParticipants(taskId);
+
+        console.log(`[API] 返回 ${participants.length} 个参与者`);
+        res.json(participants);
+    } catch (error: any) {
+        console.error('[API] 获取任务参与者错误:', error);
+        res.status(500).json({
+            error: '获取参与者失败',
+            message: error.message || '未知错误'
+        });
+    }
+});
+
 // 创建新任务
 app.post('/api/tasks', async (req, res) => {
     try {

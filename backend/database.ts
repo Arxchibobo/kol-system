@@ -873,6 +873,48 @@ export async function getTaskById(taskId: string) {
     }
 }
 
+// 获取任务的参与达人列表
+export async function getTaskParticipants(taskId: string) {
+    const database = await initDB();
+    try {
+        const result = database.exec(`
+            SELECT
+                at.id as affiliate_task_id,
+                at.affiliate_id,
+                u.name as affiliate_name,
+                u.email as affiliate_email,
+                u.tier as affiliate_tier,
+                at.status,
+                at.claimed_at,
+                COUNT(c.id) as total_clicks
+            FROM affiliate_tasks at
+            LEFT JOIN users u ON at.affiliate_id = u.id
+            LEFT JOIN clicks c ON at.id = c.affiliate_task_id
+            WHERE at.task_id = ?
+            GROUP BY at.id
+            ORDER BY at.claimed_at DESC
+        `, [taskId]);
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const participant: any = {};
+            columns.forEach((col: string, index: number) => {
+                // 字段名映射：下划线命名 -> 驼峰命名
+                const camelCol = col.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+                participant[camelCol] = row[index];
+            });
+            return participant;
+        });
+    } catch (error) {
+        console.error('[DB] 获取任务参与者失败:', error);
+        return [];
+    }
+}
+
 // ----------------------------------------------------------------------
 // 提现记录 CRUD 操作
 // ----------------------------------------------------------------------

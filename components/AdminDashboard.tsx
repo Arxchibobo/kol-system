@@ -73,6 +73,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     autoApproveUnder: 100 // 小于此金额自动通过（如果满足其他条件）
   });
 
+  // 任务参与者状态
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [taskParticipants, setTaskParticipants] = useState<Record<string, any[]>>({});
+
   // 标签分类系统
   const AVAILABLE_TAGS = ['AI博主', '时尚博主', '生活博主', '科技博主', '游戏博主', '美食博主', '旅游博主', '其他'];
   const [selectedTag, setSelectedTag] = useState<string>('全部');
@@ -553,6 +557,36 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     }
   };
 
+  // 切换任务参与者显示
+  const handleToggleParticipants = async (taskId: string) => {
+    const isExpanded = expandedTasks.has(taskId);
+
+    if (isExpanded) {
+      // 收起
+      const newExpanded = new Set(expandedTasks);
+      newExpanded.delete(taskId);
+      setExpandedTasks(newExpanded);
+    } else {
+      // 展开并加载参与者
+      const newExpanded = new Set(expandedTasks);
+      newExpanded.add(taskId);
+      setExpandedTasks(newExpanded);
+
+      // 如果还没加载过，则加载参与者数据
+      if (!taskParticipants[taskId]) {
+        try {
+          const participants = await MockStore.getTaskParticipants(taskId);
+          setTaskParticipants({
+            ...taskParticipants,
+            [taskId]: participants
+          });
+        } catch (error) {
+          console.error('加载参与者失败:', error);
+        }
+      }
+    }
+  };
+
   const renderNav = () => (
     <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit mb-8 transition-colors">
         {[
@@ -654,21 +688,35 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-            {tasks.map(task => (
-                <div key={task.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{task.title}</h3>
-                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${task.status === TaskStatus.ACTIVE ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                                {task.status}
-                            </span>
+            {tasks.map(task => {
+                const isExpanded = expandedTasks.has(task.id);
+                const participants = taskParticipants[task.id] || [];
+
+                return (
+                <div key={task.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl transition-colors overflow-hidden">
+                    <div className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                                <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{task.title}</h3>
+                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${task.status === TaskStatus.ACTIVE ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                                    {task.status}
+                                </span>
+                            </div>
+                            <p className="text-slate-600 dark:text-slate-400 text-sm max-w-xl">{task.description}</p>
+                            <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
+                                <span>Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
+                                {/* 参与者数量 */}
+                                <button
+                                    onClick={() => handleToggleParticipants(task.id)}
+                                    className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                    <Users size={14} />
+                                    <span>{participants.length || '?'} 位达人参与</span>
+                                    <ChevronRight size={14} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                </button>
+                            </div>
                         </div>
-                        <p className="text-slate-600 dark:text-slate-400 text-sm max-w-xl">{task.description}</p>
-                        <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
-                            <span>Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                          <button
                              onClick={() => handleEditClick(task)}
                              className="p-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -714,8 +762,52 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             />
                         </button>
                     </div>
+                    </div>
+
+                    {/* 参与者列表（展开时显示） */}
+                    {isExpanded && (
+                        <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4">
+                            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">参与的达人</h4>
+                            {participants.length === 0 ? (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">暂无达人参与此任务</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {participants.map((p: any) => (
+                                        <div key={p.affiliateTaskId} className="flex items-center justify-between bg-white dark:bg-slate-900 p-3 rounded-lg">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                                    {p.affiliateName?.charAt(0) || '?'}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-slate-900 dark:text-white">{p.affiliateName}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{p.affiliateEmail}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs">
+                                                <span className={`px-2 py-1 rounded-full font-medium ${
+                                                    p.affiliateTier === 'OFFICIAL_COLLABORATOR' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
+                                                    p.affiliateTier === 'PREMIUM_INFLUENCER' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                                                    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                                }`}>
+                                                    {p.affiliateTier}
+                                                </span>
+                                                <span className="text-slate-500 dark:text-slate-400">{p.totalClicks || 0} clicks</span>
+                                                <span className={`px-2 py-1 rounded-full font-medium ${
+                                                    p.status === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                                    'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                                }`}>
+                                                    {p.status}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
-            ))}
+                );
+            })}
         </div>
 
         {showCreateModal && (
@@ -793,8 +885,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                             onChange={e => setNewTask({
                                                 ...newTask,
                                                 specialRewards: {
-                                                    ...newTask.specialRewards!,
-                                                    CORE_PARTNER: parseInt(e.target.value) || 0
+                                                    CORE_PARTNER: parseInt(e.target.value) || 0,
+                                                    PREMIUM_INFLUENCER: newTask.specialRewards?.PREMIUM_INFLUENCER || TIER_RATES[Tier.PREMIUM_INFLUENCER],
+                                                    OFFICIAL_COLLABORATOR: newTask.specialRewards?.OFFICIAL_COLLABORATOR || TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
                                                 }
                                             })}
                                         />
@@ -810,8 +903,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                             onChange={e => setNewTask({
                                                 ...newTask,
                                                 specialRewards: {
-                                                    ...newTask.specialRewards!,
-                                                    PREMIUM_INFLUENCER: parseInt(e.target.value) || 0
+                                                    CORE_PARTNER: newTask.specialRewards?.CORE_PARTNER || TIER_RATES[Tier.CORE_PARTNER],
+                                                    PREMIUM_INFLUENCER: parseInt(e.target.value) || 0,
+                                                    OFFICIAL_COLLABORATOR: newTask.specialRewards?.OFFICIAL_COLLABORATOR || TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
                                                 }
                                             })}
                                         />
@@ -827,7 +921,8 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                             onChange={e => setNewTask({
                                                 ...newTask,
                                                 specialRewards: {
-                                                    ...newTask.specialRewards!,
+                                                    CORE_PARTNER: newTask.specialRewards?.CORE_PARTNER || TIER_RATES[Tier.CORE_PARTNER],
+                                                    PREMIUM_INFLUENCER: newTask.specialRewards?.PREMIUM_INFLUENCER || TIER_RATES[Tier.PREMIUM_INFLUENCER],
                                                     OFFICIAL_COLLABORATOR: parseInt(e.target.value) || 0
                                                 }
                                             })}

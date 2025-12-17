@@ -656,7 +656,22 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                 <div className="text-right">
                     <p className="text-slate-400 text-sm">{t('affiliate.nextSettlement')}</p>
                     <p className="text-2xl font-bold text-white mb-2">${dashboardUser.pendingEarnings?.toFixed(2) || '0.00'}</p>
-                    <button className="bg-white text-slate-900 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors">
+                    {/* 提现门槛提示 */}
+                    {(dashboardUser.pendingEarnings || 0) < 50 && (
+                        <div className="mb-2 text-xs text-amber-400 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            <span>还需 ${(50 - (dashboardUser.pendingEarnings || 0)).toFixed(2)} 达到提现门槛</span>
+                        </div>
+                    )}
+                    <button
+                        disabled={(dashboardUser.pendingEarnings || 0) < 50}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                            (dashboardUser.pendingEarnings || 0) >= 50
+                                ? 'bg-white text-slate-900 hover:bg-slate-200'
+                                : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                        }`}
+                        title={(dashboardUser.pendingEarnings || 0) < 50 ? '最低提现金额为 $50' : ''}
+                    >
                         {t('affiliate.requestWithdrawal')}
                     </button>
                 </div>
@@ -768,8 +783,21 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 line-clamp-3">{task.description}</p>
                     
                     <div className="space-y-2 mb-6">
-                        <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                            <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/> 该任务为您提供 ${getTaskRewardRate(task)}/1000点击
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center text-slate-700 dark:text-slate-300">
+                                <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/>
+                                <span>您的奖励</span>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                    ${getTaskRewardRate(task)}<span className="text-xs text-slate-500">/1000 clicks</span>
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {dashboardUser.tier === Tier.OFFICIAL_COLLABORATOR ? '官方合作者' :
+                                     dashboardUser.tier === Tier.PREMIUM_INFLUENCER ? '高级影响者' :
+                                     '核心伙伴'} 等级
+                                </p>
+                            </div>
                         </div>
                         <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
                             <Target size={14} className="mr-2 text-indigo-600 dark:text-indigo-400"/> {t('affiliate.requirements', { count: task.requirements?.length || 0 })}

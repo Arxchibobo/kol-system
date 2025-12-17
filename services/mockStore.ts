@@ -612,6 +612,22 @@ export const MockStore = {
     }
   },
 
+  // 获取任务的参与达人列表
+  getTaskParticipants: async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/participants`);
+      if (!response.ok) {
+        throw new Error('获取任务参与者失败');
+      }
+      const participants = await response.json();
+      console.log('[MockStore] 获取任务参与者:', participants.length);
+      return participants;
+    } catch (error: any) {
+      console.error('[MockStore] 获取任务参与者失败:', error);
+      return [];
+    }
+  },
+
   getStats: async (userId: string, role: UserRole) => {
     const data = [];
     const now = new Date();
