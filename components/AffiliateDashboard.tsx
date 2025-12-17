@@ -228,7 +228,10 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const handleGiveUp = async (affTaskId: string) => {
       if (window.confirm(t('affiliate.confirmGiveUp'))) {
           await MockStore.giveUpTask(affTaskId);
-          await loadData(); // Reload data to refresh Available Tasks list
+          // Reload data to refresh Available Tasks list（不阻塞UI）
+          loadData().catch(err => {
+            console.error('[前端] 放弃任务后刷新数据失败:', err);
+          });
       }
   };
 
@@ -248,8 +251,11 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const [refreshing, setRefreshing] = useState(false);
   const handleRefreshStats = async () => {
     setRefreshing(true);
-    await loadData();
-    setTimeout(() => setRefreshing(false), 500);
+    loadData().catch(err => {
+      console.error('[前端] 手动刷新数据失败:', err);
+    }).finally(() => {
+      setTimeout(() => setRefreshing(false), 500);
+    });
   };
 
   // 个人资料编辑状态
@@ -323,8 +329,10 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
         })
       });
 
-      // 重新加载数据
-      await loadData();
+      // 重新加载数据（不阻塞UI）
+      loadData().catch(err => {
+        console.error('[前端] 保存成功但刷新数据失败:', err);
+      });
       alert('Profile saved successfully');
     } catch (error) {
       console.error('Save failed:', error);
