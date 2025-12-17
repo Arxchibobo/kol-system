@@ -28,7 +28,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   // New Task / Edit Task Form State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [newTask, setNewTask] = useState<Partial<Task>>({ title: '', description: '', productLink: '' });
+  const [newTask, setNewTask] = useState<Partial<Task>>({ title: '', description: '', productLink: '', rewardRate: 50 });
   
   // Dedicated form states for complex fields
   const [formDeadline, setFormDeadline] = useState('');
@@ -150,7 +150,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
   const openCreateModal = () => {
       setEditingTaskId(null);
-      setNewTask({ title: '', description: '', productLink: '' });
+      setNewTask({ title: '', description: '', productLink: '', rewardRate: 50 });
       
       // Default deadline: 30 days from now
       const d = new Date();
@@ -217,7 +217,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setTasks([...updatedTasks]); // Force update
     setShowCreateModal(false);
     setEditingTaskId(null);
-    setNewTask({ title: '', description: '', productLink: '' });
+    setNewTask({ title: '', description: '', productLink: '', rewardRate: 50 });
   };
 
   const handleStopTask = async (taskId: string) => {
@@ -704,10 +704,22 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                         
                         <div>
                             <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{t('admin.formDescription')}</label>
-                            <textarea 
+                            <textarea
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 h-24 resize-none"
                                 value={newTask.description}
                                 onChange={e => setNewTask({...newTask, description: e.target.value})}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">奖励金额 ($/1000次点击)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                value={newTask.rewardRate || 0}
+                                onChange={e => setNewTask({...newTask, rewardRate: parseInt(e.target.value) || 0})}
                             />
                         </div>
 

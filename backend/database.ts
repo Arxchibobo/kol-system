@@ -680,7 +680,7 @@ export async function createTask(taskData: any) {
                 taskData.title,
                 taskData.description || '',
                 taskData.productLink || '',
-                taskData.rewardPerClick || 0,
+                taskData.rewardRate || 0,  // 使用 rewardRate 而不是 rewardPerClick
                 taskData.status || 'ACTIVE',
                 taskData.deadline || null,
                 requirementsJson
@@ -713,7 +713,7 @@ export async function updateTask(taskId: string, taskData: any) {
                 taskData.title,
                 taskData.description || '',
                 taskData.productLink || '',
-                taskData.rewardPerClick || 0,
+                taskData.rewardRate || 0,  // 使用 rewardRate 而不是 rewardPerClick
                 taskData.status || 'ACTIVE',
                 taskData.deadline || null,
                 requirementsJson,
