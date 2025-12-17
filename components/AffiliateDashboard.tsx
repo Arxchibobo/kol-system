@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Task, AffiliateTask, Tier, TIER_RATES } from '../types';
+import { User, Task, AffiliateTask, Tier, TIER_RATES, WithdrawalStatus } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
+import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw, Wallet } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -13,7 +13,7 @@ interface Props {
   user: User;
 }
 
-type Tab = 'DASHBOARD' | 'MARKET' | 'MY_TASKS' | 'PROFILE';
+type Tab = 'DASHBOARD' | 'MARKET' | 'MY_TASKS' | 'WITHDRAWALS' | 'PROFILE';
 
 export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const [activeTab, setActiveTab] = useState<Tab>('DASHBOARD');
@@ -46,6 +46,9 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     paymentMethod: 'PayPal',
     paymentDetails: ''
   });
+
+  // 提现记录
+  const [myWithdrawals, setMyWithdrawals] = useState<any[]>([]);
 
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -130,7 +133,12 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     setMyTasks(updatedMyTasks);
     setStats(s);
 
-      // 4. 检测新任务并显示提醒
+      // 4. 获取我的提现记录
+      const withdrawals = await MockStore.getAffiliateWithdrawals(initialUser.id);
+      setMyWithdrawals(withdrawals);
+      console.log('[达人端] 提现记录:', withdrawals.length, withdrawals);
+
+      // 5. 检测新任务并显示提醒
       if (refreshedUser) {
         const lastSeen = refreshedUser.lastSeenTaskTimestamp || '1970-01-01';
         const newTasks = available.filter(task => task.createdAt > lastSeen);
@@ -285,6 +293,10 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       alert('提现申请已提交，请等待审核');
       setShowWithdrawalModal(false);
       setWithdrawalForm({ paymentMethod: 'PayPal', paymentDetails: '' });
+
+      // 重新加载提现记录
+      const withdrawals = await MockStore.getAffiliateWithdrawals(dashboardUser.id);
+      setMyWithdrawals(withdrawals);
     } catch (error: any) {
       alert(error?.message || '提现申请失败，请重试');
     }
@@ -472,6 +484,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
             { id: 'DASHBOARD', icon: LayoutGrid, label: t('affiliate.dashboard') },
             { id: 'MARKET', icon: Target, label: t('affiliate.market') },
             { id: 'MY_TASKS', icon: BarChart3, label: t('affiliate.myTasks') },
+            { id: 'WITHDRAWALS', icon: Wallet, label: '提现记录' },
             { id: 'PROFILE', icon: SettingsIcon, label: t('affiliate.profile') },
         ].map((item) => (
             <button
@@ -804,6 +817,85 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       {activeTab === 'DASHBOARD' && renderDashboard()}
       {activeTab === 'MARKET' && renderMarket()}
       {activeTab === 'MY_TASKS' && renderMyTasks()}
+      {activeTab === 'WITHDRAWALS' && (
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">我的提现记录</h2>
+
+          {myWithdrawals.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center">
+              <Wallet size={48} className="mx-auto mb-4 text-slate-400" />
+              <p className="text-slate-500 dark:text-slate-400">暂无提现记录</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">完成任务并达到最低提现金额后即可申请提现</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {myWithdrawals.map((withdrawal: any) => (
+                <div key={withdrawal.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 transition-colors">
+                  <div className="flex flex-col md:flex-row justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-bold text-slate-900 dark:text-white">{withdrawal.taskTitle}</h3>
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                          withdrawal.status === WithdrawalStatus.COMPLETED ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                          withdrawal.status === WithdrawalStatus.PROCESSING ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                          withdrawal.status === WithdrawalStatus.REJECTED ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                          'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        }`}>
+                          {withdrawal.status === WithdrawalStatus.COMPLETED ? '已完成' :
+                           withdrawal.status === WithdrawalStatus.PROCESSING ? '处理中' :
+                           withdrawal.status === WithdrawalStatus.REJECTED ? '已拒绝' : '待审核'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-slate-500 dark:text-slate-400">提现金额</p>
+                          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">${withdrawal.amount.toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 dark:text-slate-400">收款方式</p>
+                          <p className="text-slate-900 dark:text-white">{withdrawal.paymentMethod}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 dark:text-slate-400">申请时间</p>
+                          <p className="text-slate-900 dark:text-white">{new Date(withdrawal.requestedAt).toLocaleString('zh-CN')}</p>
+                        </div>
+                        {withdrawal.completedAt && (
+                          <div>
+                            <p className="text-slate-500 dark:text-slate-400">完成时间</p>
+                            <p className="text-slate-900 dark:text-white">{new Date(withdrawal.completedAt).toLocaleString('zh-CN')}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {withdrawal.status === WithdrawalStatus.REJECTED && withdrawal.adminNotes && (
+                        <div className="mt-4 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+                          <p className="text-xs text-red-700 dark:text-red-400 font-medium mb-1">拒绝原因：</p>
+                          <p className="text-sm text-red-800 dark:text-red-300">{withdrawal.adminNotes}</p>
+                        </div>
+                      )}
+
+                      {withdrawal.status === WithdrawalStatus.COMPLETED && withdrawal.paymentProof && (
+                        <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                          <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mb-2">✓ 已打款</p>
+                          <a
+                            href={withdrawal.paymentProof}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                          >
+                            查看付款截图 <ExternalLink size={14} />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {activeTab === 'PROFILE' && (
           <div className="max-w-4xl space-y-6">
               <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">{t('affiliate.profileSettings')}</h2>
