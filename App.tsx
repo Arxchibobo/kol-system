@@ -9,6 +9,7 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AffiliateDashboard } from './components/AffiliateDashboard';
 import { LoginPage } from './components/LoginPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppContent() {
   const [user, setUser] = useState<User | null>(null);
@@ -206,10 +207,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <ThemeProvider>
-        <AppContent />
-      </ThemeProvider>
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }
