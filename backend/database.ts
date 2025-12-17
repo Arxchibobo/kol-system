@@ -5,8 +5,9 @@ import os from 'os';
 
 let db: SqlJsDatabase | null = null;
 
-// 使用 /tmp 目录以获得读写权限 (适用于 Cloud Run)
-const dataDir = os.tmpdir();
+// 使用项目根目录的 data 文件夹存储数据库（持久化存储）
+// 生产环境可以通过环境变量 DB_PATH 自定义路径
+const dataDir = process.env.DB_PATH || path.join(process.cwd(), 'data');
 const dbPath = path.join(dataDir, 'tracking.sqlite');
 
 // 确保数据目录存在 (对某些环境很重要)

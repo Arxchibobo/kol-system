@@ -37,3 +37,8 @@ CCimages/
 # Local test files
 本地测试指南.md
 启动服务器.bat
+
+# SQLite 数据库文件
+data/
+*.sqlite
+*.sqlite-*
