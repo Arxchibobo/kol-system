@@ -401,6 +401,12 @@ export const MockStore = {
     
     try {
         // --- CALL BACKEND TO CREATE REAL SHORT LINK ---
+        console.log('[前端] 请求生成短链接:', {
+            creator_user_id: affiliateId,
+            task_id: task.id,
+            campaign_id: task.id,
+            target_url: task.productLink
+        });
         const response = await fetchWithRetry('/api/tracking-links', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -424,8 +430,10 @@ export const MockStore = {
 
         if (contentType && contentType.includes('application/json')) {
             const result = await response.json();
+            console.log('[前端] 短链接生成响应:', result);
             if (result.success) {
-                trackingLink = result.data.short_url; 
+                trackingLink = result.data.short_url;
+                console.log('[前端] ✅ 短链接生成成功:', trackingLink);
             } else {
                 throw new Error(result.error);
             }

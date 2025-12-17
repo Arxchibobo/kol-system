@@ -107,6 +107,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setRefreshing(true);
     try {
       const taskList = await MockStore.getTasks(user.role);
+      console.log('[运营端] 获取到的任务列表:', taskList.length, taskList);
       const s = await MockStore.getStats(user.id, user.role);
       const sett = await MockStore.getSettlements();
       const aff = await MockStore.getAffiliates();
