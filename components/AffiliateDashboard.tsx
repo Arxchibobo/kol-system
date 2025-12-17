@@ -7,6 +7,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { TaskGuideModal } from './TaskGuideModal';
 import { NewTaskAlert } from './NewTaskAlert';
+import { WelcomeModal } from './WelcomeModal';
 
 interface Props {
   user: User;
@@ -35,6 +36,9 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const [showNewTaskAlert, setShowNewTaskAlert] = useState(false);
   const [newTasksCount, setNewTasksCount] = useState(0);
 
+  // 欢迎提示弹窗状态
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
   const { t } = useLanguage();
   const { theme } = useTheme();
 
@@ -47,16 +51,16 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
         setProfileData({
             followerCount: refreshedUser.followerCount || 0,
             walletAddress: refreshedUser.walletAddress || '',
-            socialLinks: refreshedUser.socialLinks || {
-                twitter: '',
-                instagram: '',
-                youtube: '',
-                tiktok: '',
-                linkedin: '',
-                reddit: '',
-                facebook: '',
-                twitch: '',
-                discord: ''
+            socialLinks: {
+                twitter: refreshedUser.socialLinks?.twitter || '',
+                instagram: refreshedUser.socialLinks?.instagram || '',
+                youtube: refreshedUser.socialLinks?.youtube || '',
+                tiktok: refreshedUser.socialLinks?.tiktok || '',
+                linkedin: refreshedUser.socialLinks?.linkedin || '',
+                reddit: refreshedUser.socialLinks?.reddit || '',
+                facebook: refreshedUser.socialLinks?.facebook || '',
+                twitch: refreshedUser.socialLinks?.twitch || '',
+                discord: refreshedUser.socialLinks?.discord || ''
             }
         });
     }
@@ -114,28 +118,39 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       const lastSeen = refreshedUser.lastSeenTaskTimestamp || '1970-01-01';
       const newTasks = available.filter(task => task.createdAt > lastSeen);
 
-      // 如果有新任务且用户开启了通知，显示提醒
-      if (newTasks.length > 0 && refreshedUser.notificationSettings?.newTaskAlert !== false) {
+      // 如果有新任务且用户开启了通知，并且当前没有显示提醒，则显示提醒
+      if (newTasks.length > 0 && refreshedUser.notificationSettings?.newTaskAlert !== false && !showNewTaskAlert) {
         setNewTasksCount(newTasks.length);
         setShowNewTaskAlert(true);
-        console.log(`[前端] 检测到 ${newTasks.length} 个新任务`);
+        console.log(`[前端] 检测到 ${newTasks.length} 个新任务，显示提醒`);
       }
     }
-  }, [initialUser]);
+  }, [initialUser, showNewTaskAlert]);
 
   useEffect(() => {
     loadData();
   }, [loadData, activeTab]);
 
-  // 实时同步：每 10 秒自动刷新数据
+  // 检查是否首次登录，如果是则显示欢迎弹窗
   useEffect(() => {
-    console.log('🔄 [达人端] 启动自动同步，每 10 秒刷新一次');
+    const hasSeenWelcome = localStorage.getItem(`myshell_welcome_seen_${initialUser.id}`);
+    if (!hasSeenWelcome) {
+      // 延迟500ms显示，让用户先看到界面
+      setTimeout(() => {
+        setShowWelcomeModal(true);
+      }, 500);
+    }
+  }, [initialUser.id]);
 
-    // 设置定时器，每 10 秒刷新一次
+  // 实时同步：每 5 秒自动刷新数据（包括检测新任务）
+  useEffect(() => {
+    console.log('🔄 [达人端] 启动自动同步，每 5 秒刷新一次');
+
+    // 设置定时器，每 5 秒刷新一次
     const intervalId = setInterval(() => {
-      console.log('⏰ [达人端] 自动刷新数据...');
+      console.log('⏰ [达人端] 自动刷新数据并检测新任务...');
       loadData();
-    }, 10000); // 10 秒
+    }, 5000); // 5 秒，让新任务提醒更及时
 
     // 清理定时器
     return () => {
@@ -144,22 +159,31 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     };
   }, [loadData]); // 依赖 loadData，确保使用最新的函数
 
-  const handleClaim = async (task: Task) => {
-    const newTask = await MockStore.claimTask(dashboardUser.id, task);
-    setMyTasks([...myTasks, newTask]);
-    setAvailableTasks(availableTasks.filter(t => t.id !== task.id));
-    setSelectedTask(null); // 关闭任务详情模态框
+  // 点击 "Confirm & Claim" 按钮 - 先显示任务指引
+  const handleConfirmClaim = (task: Task) => {
+    // 关闭任务详情模态框
+    setSelectedTask(null);
 
     // 显示任务指引弹窗
     setGuideModalTask(task);
     setShowGuideModal(true);
   };
 
-  // 任务指引完成后的处理
-  const handleGuideComplete = () => {
+  // 任务指引确认后 - 执行实际的领取操作
+  const handleGuideComplete = async () => {
+    if (!guideModalTask) return;
+
+    // 执行领取任务
+    const newTask = await MockStore.claimTask(dashboardUser.id, guideModalTask);
+    setMyTasks([...myTasks, newTask]);
+    setAvailableTasks(availableTasks.filter(t => t.id === guideModalTask.id ? false : true));
+
+    // 关闭指引弹窗
     setShowGuideModal(false);
     setGuideModalTask(null);
-    setActiveTab('MY_TASKS'); // 跳转到 My Tasks 页面
+
+    // 跳转到 My Tasks 页面
+    setActiveTab('MY_TASKS');
   };
 
   // 查看新任务
@@ -173,6 +197,12 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   // 关闭新任务提醒
   const handleDismissNewTaskAlert = () => {
     setShowNewTaskAlert(false);
+  };
+
+  // 关闭欢迎弹窗
+  const handleCloseWelcome = () => {
+    setShowWelcomeModal(false);
+    localStorage.setItem(`myshell_welcome_seen_${dashboardUser.id}`, 'true');
   };
   
   const handleGiveUp = async (affTaskId: string) => {
@@ -411,7 +441,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     onClick={handleRefreshStats}
                     disabled={refreshing}
                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    title="手动刷新（系统每 10 秒自动刷新）"
+                    title="手动刷新（系统每 5 秒自动刷新）"
                 >
                     <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                 </button>
@@ -512,7 +542,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                             <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/> {t('affiliate.baseReward', { rate: task.rewardRate || 0 })}
                         </div>
                         <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                            <Target size={14} className="mr-2 text-indigo-600 dark:text-indigo-400"/> {t('affiliate.requirements', { count: task.requirements.length })}
+                            <Target size={14} className="mr-2 text-indigo-600 dark:text-indigo-400"/> {t('affiliate.requirements', { count: task.requirements?.length || 0 })}
                         </div>
                     </div>
                 </div>
@@ -538,7 +568,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     onClick={handleRefreshStats}
                     disabled={refreshing}
                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    title="手动刷新（系统每 10 秒自动刷新）"
+                    title="手动刷新（系统每 5 秒自动刷新）"
                 >
                     <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                 </button>
@@ -984,7 +1014,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                             <Target size={16} /> {t('affiliate.campaignReqs')}
                         </h4>
                         <ul className="space-y-2">
-                            {selectedTask.requirements.map((req, idx) => (
+                            {(selectedTask.requirements || []).map((req, idx) => (
                                 <li key={idx} className="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-300">
                                     <div className="mt-1 w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
                                     {req}
@@ -1001,8 +1031,8 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     >
                         {t('common.cancel')}
                     </button>
-                    <button 
-                        onClick={() => handleClaim(selectedTask)}
+                    <button
+                        onClick={() => handleConfirmClaim(selectedTask)}
                         className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20"
                     >
                         {t('affiliate.confirmClaim')} <ChevronRight size={16} />
@@ -1028,6 +1058,15 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
           taskCount={newTasksCount}
           onViewTasks={handleViewNewTasks}
           onDismiss={handleDismissNewTaskAlert}
+        />
+      )}
+
+      {/* 欢迎提示弹窗 */}
+      {showWelcomeModal && (
+        <WelcomeModal
+          isOpen={showWelcomeModal}
+          userName={dashboardUser.name}
+          onClose={handleCloseWelcome}
         />
       )}
     </div>

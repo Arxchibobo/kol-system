@@ -285,7 +285,7 @@ export const translations = {
       qualityScore: "质量评分",
       totalEarnings: "累计收益",
       clickPerformance: "点击数据趋势 (近7天)",
-      baseReward: "基础奖励: ${rate}/1000次点击",
+      baseReward: "基础奖励: {rate}/1000次点击",
       requirements: "{count} 个任务要求",
       claimTask: "领取任务",
       taskTracking: "任务 #{id} 追踪",
