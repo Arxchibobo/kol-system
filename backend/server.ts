@@ -99,6 +99,7 @@ app.post('/api/tracking-links', async (req, res) => {
         // Retry logic for collision handling
         while (retries < 5) {
             try {
+                console.log(`[API] 尝试创建链接，code: ${code}`);
                 await createLink({
                     creator_user_id,
                     task_id,
@@ -106,20 +107,22 @@ app.post('/api/tracking-links', async (req, res) => {
                     target_url,
                     code
                 });
+                console.log(`[API] ✅ 链接创建成功`);
                 break;
             } catch (e: any) {
                 if (e.message && e.message.includes('UNIQUE constraint failed')) {
-                    console.warn(`Collision detected for code ${code}, retrying...`);
+                    console.warn(`⚠️ Code冲突: ${code}, 重新生成...`);
                     code = generateCode();
                     retries++;
                 } else {
+                    console.error(`❌ 创建链接失败:`, e);
                     throw e;
                 }
             }
         }
 
         const shortUrl = `https://${DOMAIN}/${code}`;
-        console.log(`[Link Created] ${shortUrl} -> ${target_url}`);
+        console.log(`[API] 📎 短链接生成: ${shortUrl} -> ${target_url}`);
 
         return res.json({
             success: true,
@@ -415,6 +418,7 @@ app.all('/api/*', (req, res) => {
 // ----------------------------------------------------------------------
 const handleRedirect = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const { code } = req.params;
+    console.log(`[重定向] 收到请求: /${code}`);
 
     // 1. Strict Filter: Ignore specific system paths, assets, and error prefixes
     const ignoredPrefixes = ['health', 'api', 'assets', 'favicon', 'robots', 'manifest', 'index', 'err-', 'r'];
@@ -424,24 +428,29 @@ const handleRedirect = async (req: express.Request, res: express.Response, next:
         code.includes('.') ||
         ignoredPrefixes.some(prefix => code.startsWith(prefix))
     ) {
+        console.log(`[重定向] 跳过处理: ${code} (匹配忽略规则)`);
         return next();
     }
 
     try {
         // 2. Lookup in SQLite
+        console.log(`[重定向] 查询数据库: ${code}`);
         const link = await getLinkByCode(code);
+        console.log(`[重定向] 查询结果:`, link);
 
         if (link) {
             const ip = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '';
             const ua = req.get('User-Agent') || '';
             const referrer = req.get('Referrer') || '';
 
+            console.log(`[重定向] 找到链接记录，准备记录点击`);
             // 3. Log Click (异步执行，不阻塞重定向)
             logClick(link.id, ip, ua, referrer).catch(err => {
                 console.error(`[Click Log Error] Link ${code}:`, err);
             });
 
             // 4. Build tracking URL with parameters (实现"两次跳转"功能)
+            console.log(`[重定向] 目标URL: ${link.target_url}`);
             const targetUrl = new URL(link.target_url);
             targetUrl.searchParams.set('utm_source', 'myshell');
             targetUrl.searchParams.set('utm_medium', 'affiliate');
@@ -450,10 +459,11 @@ const handleRedirect = async (req: express.Request, res: express.Response, next:
             targetUrl.searchParams.set('ref', code);
 
             const finalUrl = targetUrl.toString();
-            console.log(`[Redirect] ${code} -> ${finalUrl} (IP: ${ip})`);
+            console.log(`[重定向] ✅ 302重定向: ${code} -> ${finalUrl} (IP: ${ip})`);
             return res.redirect(302, finalUrl);
         }
 
+        console.log(`[重定向] ⚠️ 未找到链接记录: ${code}，继续下一个处理器`);
         next();
     } catch (error) {
         console.error('Redirect Logic Error:', error);
