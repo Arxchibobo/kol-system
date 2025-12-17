@@ -43,32 +43,33 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const { theme } = useTheme();
 
   const loadData = useCallback(async () => {
-    // 1. 获取最新用户数据（包含统计数据和资料数据）
-    const refreshedUser = await MockStore.login(initialUser.email);
-    if (refreshedUser) {
-        setDashboardUser(refreshedUser);
-        // 同步更新 profileData 状态，确保 Profile 页面显示最新数据
-        setProfileData({
-            followerCount: refreshedUser.followerCount || 0,
-            walletAddress: refreshedUser.walletAddress || '',
-            socialLinks: {
-                twitter: refreshedUser.socialLinks?.twitter || '',
-                instagram: refreshedUser.socialLinks?.instagram || '',
-                youtube: refreshedUser.socialLinks?.youtube || '',
-                tiktok: refreshedUser.socialLinks?.tiktok || '',
-                linkedin: refreshedUser.socialLinks?.linkedin || '',
-                reddit: refreshedUser.socialLinks?.reddit || '',
-                facebook: refreshedUser.socialLinks?.facebook || '',
-                twitch: refreshedUser.socialLinks?.twitch || '',
-                discord: refreshedUser.socialLinks?.discord || ''
-            }
-        });
-    }
+    try {
+      // 1. 获取最新用户数据（包含统计数据和资料数据）
+      const refreshedUser = await MockStore.login(initialUser.email);
+      if (refreshedUser) {
+          setDashboardUser(refreshedUser);
+          // 同步更新 profileData 状态，确保 Profile 页面显示最新数据
+          setProfileData({
+              followerCount: refreshedUser.followerCount || 0,
+              walletAddress: refreshedUser.walletAddress || '',
+              socialLinks: {
+                  twitter: refreshedUser.socialLinks?.twitter || '',
+                  instagram: refreshedUser.socialLinks?.instagram || '',
+                  youtube: refreshedUser.socialLinks?.youtube || '',
+                  tiktok: refreshedUser.socialLinks?.tiktok || '',
+                  linkedin: refreshedUser.socialLinks?.linkedin || '',
+                  reddit: refreshedUser.socialLinks?.reddit || '',
+                  facebook: refreshedUser.socialLinks?.facebook || '',
+                  twitch: refreshedUser.socialLinks?.twitch || '',
+                  discord: refreshedUser.socialLinks?.discord || ''
+              }
+          });
+      }
 
-    // 2. Fetch Tasks and Stats
-    const t = await MockStore.getTasks(initialUser.role);
-    const mt = await MockStore.getMyTasks(initialUser.id);
-    const s = await MockStore.getStats(initialUser.id, initialUser.role);
+      // 2. Fetch Tasks and Stats
+      const t = await MockStore.getTasks(initialUser.role);
+      const mt = await MockStore.getMyTasks(initialUser.id);
+      const s = await MockStore.getStats(initialUser.id, initialUser.role);
 
     // 3. 从后端 API 获取每个任务的真实点击统计
     const updatedMyTasks = await Promise.all(
@@ -113,17 +114,21 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     setMyTasks(updatedMyTasks);
     setStats(s);
 
-    // 4. 检测新任务并显示提醒
-    if (refreshedUser) {
-      const lastSeen = refreshedUser.lastSeenTaskTimestamp || '1970-01-01';
-      const newTasks = available.filter(task => task.createdAt > lastSeen);
+      // 4. 检测新任务并显示提醒
+      if (refreshedUser) {
+        const lastSeen = refreshedUser.lastSeenTaskTimestamp || '1970-01-01';
+        const newTasks = available.filter(task => task.createdAt > lastSeen);
 
-      // 如果有新任务且用户开启了通知，并且当前没有显示提醒，则显示提醒
-      if (newTasks.length > 0 && refreshedUser.notificationSettings?.newTaskAlert !== false && !showNewTaskAlert) {
-        setNewTasksCount(newTasks.length);
-        setShowNewTaskAlert(true);
-        console.log(`[前端] 检测到 ${newTasks.length} 个新任务，显示提醒`);
+        // 如果有新任务且用户开启了通知，并且当前没有显示提醒，则显示提醒
+        if (newTasks.length > 0 && refreshedUser.notificationSettings?.newTaskAlert !== false && !showNewTaskAlert) {
+          setNewTasksCount(newTasks.length);
+          setShowNewTaskAlert(true);
+          console.log(`[前端] 检测到 ${newTasks.length} 个新任务，显示提醒`);
+        }
       }
+    } catch (error) {
+      console.error('[前端] 加载数据失败:', error);
+      // 不影响用户界面，静默失败
     }
   }, [initialUser, showNewTaskAlert]);
 
@@ -184,8 +189,10 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       // 跳转到 My Tasks 页面
       setActiveTab('MY_TASKS');
 
-      // 重新加载数据以确保状态同步
-      await loadData();
+      // 重新加载数据以确保状态同步（不阻塞UI）
+      loadData().catch(err => {
+        console.error('[前端] 领取成功但刷新数据失败:', err);
+      });
     } catch (error: any) {
       console.error('[前端] 领取任务失败:', error);
 
