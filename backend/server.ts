@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, getAllTasks, createTask, updateTask, getTaskById } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, getAllTasks, createTask, updateTask, getTaskById, createWithdrawalRequest, getAllWithdrawalRequests, getWithdrawalRequestsByAffiliate, updateWithdrawalStatus } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -404,6 +404,98 @@ app.delete('/api/tasks/:taskId', async (req, res) => {
             error: 'Failed to delete task',
             message: error.message || '未知错误'
         });
+    }
+});
+
+// ----------------------------------------------------------------------
+// 提现请求 API
+// ----------------------------------------------------------------------
+
+// 创建提现请求
+app.post('/api/withdrawals', async (req, res) => {
+    try {
+        const { affiliateId, affiliateName, affiliateTaskId, taskTitle, amount, paymentMethod, paymentDetails } = req.body;
+        console.log('[API] 创建提现请求:', affiliateName, amount);
+
+        if (!affiliateId || !amount || !paymentMethod || !paymentDetails) {
+            return res.status(400).json({ error: '缺少必要参数' });
+        }
+
+        const withdrawalId = `wd-${Date.now()}`;
+        await createWithdrawalRequest({
+            id: withdrawalId,
+            affiliateId,
+            affiliateName,
+            affiliateTaskId,
+            taskTitle,
+            amount,
+            paymentMethod,
+            paymentDetails
+        });
+
+        console.log(`[API] ✅ 提现请求创建成功: ${withdrawalId}`);
+        res.json({
+            success: true,
+            message: '提现请求已提交，运营侧会在7个工作日内进行处理',
+            withdrawalId
+        });
+    } catch (error: any) {
+        console.error('[API] 创建提现请求失败:', error);
+        res.status(500).json({ error: error.message || '创建提现请求失败' });
+    }
+});
+
+// 获取所有提现请求（运营侧）
+app.get('/api/withdrawals', async (req, res) => {
+    try {
+        console.log('[API] 获取所有提现请求');
+        const withdrawals = await getAllWithdrawalRequests();
+        console.log(`[API] 返回 ${withdrawals.length} 条提现记录`);
+        res.json(withdrawals);
+    } catch (error: any) {
+        console.error('[API] 获取提现请求失败:', error);
+        res.status(500).json({ error: error.message || '获取提现请求失败' });
+    }
+});
+
+// 获取达人的提现记录
+app.get('/api/withdrawals/affiliate/:affiliateId', async (req, res) => {
+    try {
+        const { affiliateId } = req.params;
+        console.log('[API] 获取达人提现记录:', affiliateId);
+        const withdrawals = await getWithdrawalRequestsByAffiliate(affiliateId);
+        console.log(`[API] 返回 ${withdrawals.length} 条提现记录`);
+        res.json(withdrawals);
+    } catch (error: any) {
+        console.error('[API] 获取达人提现记录失败:', error);
+        res.status(500).json({ error: error.message || '获取提现记录失败' });
+    }
+});
+
+// 更新提现状态
+app.put('/api/withdrawals/:withdrawalId/status', async (req, res) => {
+    try {
+        const { withdrawalId } = req.params;
+        const { status, paymentProof, adminNotes } = req.body;
+
+        console.log('[API] 更新提现状态:', withdrawalId, '->', status);
+
+        if (!status) {
+            return res.status(400).json({ error: '缺少状态参数' });
+        }
+
+        await updateWithdrawalStatus(withdrawalId, status, paymentProof, adminNotes);
+
+        console.log(`[API] ✅ 提现状态更新成功: ${withdrawalId}`);
+        res.json({
+            success: true,
+            message: '提现状态更新成功',
+            withdrawalId,
+            status
+        });
+    } catch (error: any) {
+        console.error('[API] 更新提现状态失败:', error);
+        res.status(500).json({ error: error.message || '更新提现状态失败' });
     }
 });
 
