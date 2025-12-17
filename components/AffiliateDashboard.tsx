@@ -278,10 +278,18 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   // 获取任务的奖励金额（根据用户等级和任务配置）
   const getTaskRewardRate = (task: Task): number => {
     const userTier = dashboardUser.tier || Tier.CORE_PARTNER;
+
+    // 如果任务有特殊奖励配置，使用特殊奖励
     if (task.isSpecialReward && task.specialRewards) {
-      return task.specialRewards[userTier];
+      const specialReward = task.specialRewards[userTier];
+      if (specialReward !== undefined && specialReward !== null) {
+        return specialReward;
+      }
     }
-    return TIER_RATES[userTier];
+
+    // 否则使用默认等级奖励
+    const defaultRate = TIER_RATES[userTier];
+    return defaultRate !== undefined ? defaultRate : 50; // 确保总是返回一个数字，默认50
   };
 
   // 打开提现弹窗
