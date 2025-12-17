@@ -173,17 +173,30 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   const handleGuideComplete = async () => {
     if (!guideModalTask) return;
 
-    // 执行领取任务
-    const newTask = await MockStore.claimTask(dashboardUser.id, guideModalTask);
-    setMyTasks([...myTasks, newTask]);
-    setAvailableTasks(availableTasks.filter(t => t.id === guideModalTask.id ? false : true));
+    try {
+      // 执行领取任务
+      await MockStore.claimTask(dashboardUser.id, guideModalTask);
 
-    // 关闭指引弹窗
-    setShowGuideModal(false);
-    setGuideModalTask(null);
+      // 关闭指引弹窗
+      setShowGuideModal(false);
+      setGuideModalTask(null);
 
-    // 跳转到 My Tasks 页面
-    setActiveTab('MY_TASKS');
+      // 跳转到 My Tasks 页面
+      setActiveTab('MY_TASKS');
+
+      // 重新加载数据以确保状态同步
+      await loadData();
+    } catch (error: any) {
+      console.error('[前端] 领取任务失败:', error);
+
+      // 关闭指引弹窗
+      setShowGuideModal(false);
+      setGuideModalTask(null);
+
+      // 显示错误信息
+      const errorMessage = error?.message || '领取任务失败，请重试';
+      alert(errorMessage);
+    }
   };
 
   // 查看新任务
