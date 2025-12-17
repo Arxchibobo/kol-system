@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Task, AffiliateTask, Tier, TIER_RATES, TIER_THRESHOLDS } from '../types';
+import { User, Task, AffiliateTask, Tier, TIER_RATES } from '../types';
 import { MockStore } from '../services/mockStore';
 import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -38,6 +38,14 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
 
   // 欢迎提示弹窗状态
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
+  // 提现弹窗状态
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [withdrawalTask, setWithdrawalTask] = useState<AffiliateTask | null>(null);
+  const [withdrawalForm, setWithdrawalForm] = useState({
+    paymentMethod: 'PayPal',
+    paymentDetails: ''
+  });
 
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -82,9 +90,13 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     const stats = await statsRes.json();
                     console.log(`[前端] 获取任务 ${task.taskId} 点击统计:`, stats);
 
-                    // 计算预估收益
-                    const tier = refreshedUser?.tier || 'BRONZE';
-                    const rate = TIER_RATES[tier as Tier] || 15;
+                    // 计算预估收益 - 根据任务配置和用户等级
+                    const userTier = refreshedUser?.tier || Tier.CORE_PARTNER;
+                    const taskData = t.find(tsk => tsk.id === task.taskId);
+                    let rate = TIER_RATES[userTier];
+                    if (taskData?.isSpecialReward && taskData?.specialRewards) {
+                        rate = taskData.specialRewards[userTier];
+                    }
                     const estimatedEarnings = (stats.totalClicks * rate) / 1000;
 
                     return {
@@ -237,6 +249,45 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
             console.error('[前端] 放弃任务后刷新数据失败:', err);
           });
       }
+  };
+
+  // 获取任务的奖励金额（根据用户等级和任务配置）
+  const getTaskRewardRate = (task: Task): number => {
+    const userTier = dashboardUser.tier || Tier.CORE_PARTNER;
+    if (task.isSpecialReward && task.specialRewards) {
+      return task.specialRewards[userTier];
+    }
+    return TIER_RATES[userTier];
+  };
+
+  // 打开提现弹窗
+  const handleOpenWithdrawal = (task: AffiliateTask) => {
+    setWithdrawalTask(task);
+    setShowWithdrawalModal(true);
+  };
+
+  // 提交提现申请
+  const handleSubmitWithdrawal = async () => {
+    if (!withdrawalTask) return;
+
+    try {
+      const taskDef = allTasks.find(t => t.id === withdrawalTask.taskId);
+      await MockStore.createWithdrawalRequest({
+        affiliateId: dashboardUser.id,
+        affiliateName: dashboardUser.name,
+        affiliateTaskId: withdrawalTask.id,
+        taskTitle: taskDef?.title || 'Unknown Task',
+        amount: withdrawalTask.stats.estimatedEarnings,
+        paymentMethod: withdrawalForm.paymentMethod,
+        paymentDetails: withdrawalForm.paymentDetails
+      });
+
+      alert('提现申请已提交，请等待审核');
+      setShowWithdrawalModal(false);
+      setWithdrawalForm({ paymentMethod: 'PayPal', paymentDetails: '' });
+    } catch (error: any) {
+      alert(error?.message || '提现申请失败，请重试');
+    }
   };
 
   const handleSubmitLink = async (affTaskId: string, link: string) => {
@@ -571,7 +622,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                     
                     <div className="space-y-2 mb-6">
                         <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                            <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/> {t('affiliate.baseReward', { rate: task.rewardRate || 0 })}
+                            <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/> 该任务为您提供 ${getTaskRewardRate(task)}/1000点击
                         </div>
                         <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
                             <Target size={14} className="mr-2 text-indigo-600 dark:text-indigo-400"/> {t('affiliate.requirements', { count: task.requirements?.length || 0 })}
@@ -711,6 +762,22 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                                 <p className="text-xs text-slate-500">{t('affiliate.conversion')}</p>
                                 <p className="text-sm font-mono text-slate-600 dark:text-slate-300">{(at.stats.conversionRate * 100).toFixed(1)}%</p>
                              </div>
+
+                             {/* Withdrawal Button */}
+                             {at.submittedPostLink && at.stats.estimatedEarnings >= 50 && (
+                                 <button
+                                     onClick={() => handleOpenWithdrawal(at)}
+                                     className="w-full mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                                 >
+                                     <DollarSign size={16} />
+                                     申请提现
+                                 </button>
+                             )}
+                             {at.submittedPostLink && at.stats.estimatedEarnings < 50 && (
+                                 <p className="text-xs text-slate-500 text-center mt-2">
+                                     最低提现金额: $50
+                                 </p>
+                             )}
                         </div>
                     </div>
                 </div>
@@ -1100,6 +1167,82 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
           userName={dashboardUser.name}
           onClose={handleCloseWelcome}
         />
+      )}
+
+      {/* Withdrawal Modal */}
+      {showWithdrawalModal && withdrawalTask && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowWithdrawalModal(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">申请提现</h2>
+              <button onClick={() => setShowWithdrawalModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">任务</p>
+                <p className="font-medium text-slate-900 dark:text-white">{allTasks.find(t => t.id === withdrawalTask.taskId)?.title}</p>
+              </div>
+
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <p className="text-sm text-emerald-700 dark:text-emerald-400 mb-1">提现金额</p>
+                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${withdrawalTask.stats.estimatedEarnings.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">收款方式</label>
+                <select
+                  value={withdrawalForm.paymentMethod}
+                  onChange={(e) => setWithdrawalForm({ ...withdrawalForm, paymentMethod: e.target.value })}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="PayPal">PayPal</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Crypto (USDT-TRC20)">Crypto (USDT-TRC20)</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  收款账号
+                  <span className="text-xs text-slate-500 ml-2">(邮箱/账号/地址)</span>
+                </label>
+                <input
+                  type="text"
+                  value={withdrawalForm.paymentDetails}
+                  onChange={(e) => setWithdrawalForm({ ...withdrawalForm, paymentDetails: e.target.value })}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="请输入收款账号"
+                />
+              </div>
+
+              <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <p className="text-xs text-yellow-800 dark:text-yellow-400">
+                  ⚠️ 提现申请提交后，运营团队将在 1-3 个工作日内处理。请确保收款信息准确无误。
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowWithdrawalModal(false)}
+                className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-lg font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSubmitWithdrawal}
+                disabled={!withdrawalForm.paymentDetails}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg font-medium"
+              >
+                确认提现
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
