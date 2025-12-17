@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Task, AffiliateTask, Tier, TIER_RATES, WithdrawalStatus } from '../types';
+import { User, Task, AffiliateTask, Tier, TIER_RATES, WithdrawalStatus, Notification } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw, Wallet } from 'lucide-react';
+import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw, Wallet, Bell } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -49,6 +49,11 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
 
   // 提现记录
   const [myWithdrawals, setMyWithdrawals] = useState<any[]>([]);
+
+  // 通知系统状态
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
 
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -138,7 +143,14 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
       setMyWithdrawals(withdrawals);
       console.log('[达人端] 提现记录:', withdrawals.length, withdrawals);
 
-      // 5. 检测新任务并显示提醒
+      // 5. 获取通知和未读数量
+      const notifs = await MockStore.getNotifications(initialUser.id);
+      const unread = await MockStore.getUnreadNotificationCount(initialUser.id);
+      setNotifications(notifs);
+      setUnreadCount(unread);
+      console.log('[达人端] 通知:', notifs.length, '未读:', unread);
+
+      // 6. 检测新任务并显示提醒
       if (refreshedUser) {
         const lastSeen = refreshedUser.lastSeenTaskTimestamp || '1970-01-01';
         const newTasks = available.filter(task => task.createdAt > lastSeen);
@@ -477,6 +489,124 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     }
   };
 
+  // 通知处理函数
+  const handleMarkNotificationAsRead = async (notificationId: string) => {
+    try {
+      await MockStore.markNotificationAsRead(notificationId);
+      // 更新本地状态
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('标记通知已读失败:', error);
+    }
+  };
+
+  const handleMarkAllNotificationsAsRead = async () => {
+    try {
+      await MockStore.markAllNotificationsAsRead(dashboardUser.id);
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('标记所有通知已读失败:', error);
+    }
+  };
+
+
+  // 渲染通知面板
+  const renderNotificationPanel = () => {
+    if (!showNotificationPanel) return null;
+
+    return (
+      <div className="fixed top-20 right-4 w-96 max-h-[600px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden">
+        {/* 头部 */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <Bell size={18} className="text-slate-600 dark:text-slate-400" />
+            <h3 className="font-bold text-slate-900 dark:text-white">通知中心</h3>
+            {unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                {unreadCount}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllNotificationsAsRead}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                全部已读
+              </button>
+            )}
+            <button
+              onClick={() => setShowNotificationPanel(false)}
+              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
+            >
+              <X size={16} className="text-slate-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* 通知列表 */}
+        <div className="overflow-y-auto max-h-[500px]">
+          {notifications.length === 0 ? (
+            <div className="p-8 text-center">
+              <Bell size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-700" />
+              <p className="text-slate-500 dark:text-slate-400 text-sm">暂无通知</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200 dark:divide-slate-800">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  onClick={() => {
+                    if (!notification.isRead) {
+                      handleMarkNotificationAsRead(notification.id);
+                    }
+                  }}
+                  className={`p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
+                    !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/10' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-1 p-2 rounded-full ${
+                      notification.type === 'WITHDRAWAL_COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                      notification.type === 'WITHDRAWAL_PROCESSING' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                      notification.type === 'WITHDRAWAL_REJECTED' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                      'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {notification.type === 'WITHDRAWAL_COMPLETED' ? <CheckCircle size={16} /> :
+                       notification.type === 'WITHDRAWAL_PROCESSING' ? <Loader2 size={16} /> :
+                       notification.type === 'WITHDRAWAL_REJECTED' ? <X size={16} /> :
+                       <Bell size={16} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="font-medium text-slate-900 dark:text-white text-sm">
+                          {notification.title}
+                        </h4>
+                        {!notification.isRead && (
+                          <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        {new Date(notification.createdAt).toLocaleString('zh-CN')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderNav = () => (
     <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 w-fit mb-8 transition-colors">
@@ -806,11 +936,31 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
             <h1 className="text-3xl font-bold mb-2 text-slate-900 dark:text-white">{t('common.welcome')}, {dashboardUser.name}</h1>
             <p className="text-slate-500 dark:text-slate-400">Track your impact and grow your earnings.</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('affiliate.systemOperational')}</span>
+        <div className="flex items-center gap-4">
+          {/* 通知铃铛 */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+              className="relative p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+            >
+              <Bell size={20} className="text-slate-600 dark:text-slate-400" />
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('affiliate.systemOperational')}</span>
+          </div>
         </div>
       </div>
+
+      {/* 通知面板 */}
+      {renderNotificationPanel()}
 
       {renderNav()}
 

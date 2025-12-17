@@ -476,7 +476,7 @@ app.get('/api/withdrawals/affiliate/:affiliateId', async (req, res) => {
 app.put('/api/withdrawals/:withdrawalId/status', async (req, res) => {
     try {
         const { withdrawalId } = req.params;
-        const { status, paymentProof, adminNotes } = req.body;
+        const { status, paymentProof, adminNotes, affiliateId, amount, taskTitle } = req.body;
 
         console.log('[API] 更新提现状态:', withdrawalId, '->', status);
 
@@ -485,6 +485,49 @@ app.put('/api/withdrawals/:withdrawalId/status', async (req, res) => {
         }
 
         await updateWithdrawalStatus(withdrawalId, status, paymentProof, adminNotes);
+
+        // 创建状态变更通知
+        if (affiliateId) {
+            const { createNotification } = await import('./database.js');
+            let notificationTitle = '';
+            let notificationMessage = '';
+            let notificationType = '';
+            let notificationData: any = { amount, withdrawalId, taskTitle };
+
+            if (status === 'PROCESSING') {
+                notificationType = 'WITHDRAWAL_PROCESSING';
+                notificationTitle = '提现申请处理中';
+                notificationMessage = `您的提现申请（${taskTitle}，$${amount}）正在处理中，请耐心等待。`;
+            } else if (status === 'COMPLETED') {
+                notificationType = 'WITHDRAWAL_COMPLETED';
+                notificationTitle = '提现已完成';
+                notificationMessage = `恭喜！您的提现（${taskTitle}，$${amount}）已成功打款，请查收。`;
+                if (paymentProof) {
+                    notificationData.paymentProof = paymentProof;
+                }
+            } else if (status === 'REJECTED') {
+                notificationType = 'WITHDRAWAL_REJECTED';
+                notificationTitle = '提现申请被拒绝';
+                notificationMessage = `抱歉，您的提现申请（${taskTitle}，$${amount}）被拒绝。${adminNotes ? `原因：${adminNotes}` : ''}`;
+                if (adminNotes) {
+                    notificationData.reason = adminNotes;
+                }
+            }
+
+            if (notificationType) {
+                await createNotification({
+                    id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    userId: affiliateId,
+                    type: notificationType,
+                    title: notificationTitle,
+                    message: notificationMessage,
+                    relatedId: withdrawalId,
+                    isRead: false,
+                    data: notificationData
+                });
+                console.log(`[API] ✅ 通知已创建: ${notificationType}`);
+            }
+        }
 
         console.log(`[API] ✅ 提现状态更新成功: ${withdrawalId}`);
         res.json({
@@ -496,6 +539,66 @@ app.put('/api/withdrawals/:withdrawalId/status', async (req, res) => {
     } catch (error: any) {
         console.error('[API] 更新提现状态失败:', error);
         res.status(500).json({ error: error.message || '更新提现状态失败' });
+    }
+});
+
+// ----------------------------------------------------------------------
+// 通知相关 API
+// ----------------------------------------------------------------------
+
+// 获取用户的所有通知
+app.get('/api/notifications/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { getNotificationsByUser } = await import('./database.js');
+        const notifications = await getNotificationsByUser(userId);
+
+        res.json(notifications);
+    } catch (error: any) {
+        console.error('[API] 获取通知失败:', error);
+        res.status(500).json({ error: error.message || '获取通知失败' });
+    }
+});
+
+// 获取未读通知数量
+app.get('/api/notifications/:userId/unread-count', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { getUnreadNotificationCount } = await import('./database.js');
+        const count = await getUnreadNotificationCount(userId);
+
+        res.json({ count });
+    } catch (error: any) {
+        console.error('[API] 获取未读通知数量失败:', error);
+        res.status(500).json({ error: error.message || '获取未读通知数量失败' });
+    }
+});
+
+// 标记通知为已读
+app.put('/api/notifications/:notificationId/read', async (req, res) => {
+    try {
+        const { notificationId } = req.params;
+        const { markNotificationAsRead } = await import('./database.js');
+        await markNotificationAsRead(notificationId);
+
+        res.json({ success: true, message: '通知已标记为已读' });
+    } catch (error: any) {
+        console.error('[API] 标记通知已读失败:', error);
+        res.status(500).json({ error: error.message || '标记通知已读失败' });
+    }
+});
+
+// 标记所有通知为已读
+app.put('/api/notifications/:userId/read-all', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { markAllNotificationsAsRead } = await import('./database.js');
+        await markAllNotificationsAsRead(userId);
+
+        res.json({ success: true, message: '所有通知已标记为已读' });
+    } catch (error: any) {
+        console.error('[API] 标记所有通知已读失败:', error);
+        res.status(500).json({ error: error.message || '标记所有通知已读失败' });
     }
 });
 

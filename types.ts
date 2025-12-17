@@ -136,3 +136,27 @@ export const TIER_LABELS = {
   [Tier.PREMIUM_INFLUENCER]: { zh: '高级影响者', en: 'Premium Influencer' },
   [Tier.OFFICIAL_COLLABORATOR]: { zh: '官方合作者', en: 'Official Collaborator' }
 };
+
+// 通知类型
+export enum NotificationType {
+  WITHDRAWAL_SUBMITTED = 'WITHDRAWAL_SUBMITTED',     // 提现申请已提交
+  WITHDRAWAL_PROCESSING = 'WITHDRAWAL_PROCESSING',   // 提现处理中
+  WITHDRAWAL_COMPLETED = 'WITHDRAWAL_COMPLETED',     // 提现已完成
+  WITHDRAWAL_REJECTED = 'WITHDRAWAL_REJECTED',       // 提现被拒绝
+  TASK_ASSIGNED = 'TASK_ASSIGNED',                   // 新任务分配
+  TASK_VERIFIED = 'TASK_VERIFIED',                   // 任务审核通过
+  TIER_UPGRADED = 'TIER_UPGRADED'                    // 等级提升
+}
+
+// 通知接口
+export interface Notification {
+  id: string;
+  userId: string;                    // 接收通知的用户ID
+  type: NotificationType;            // 通知类型
+  title: string;                     // 通知标题
+  message: string;                   // 通知内容
+  relatedId?: string;                // 相关对象ID（如提现ID、任务ID）
+  isRead: boolean;                   // 是否已读
+  createdAt: string;                 // 创建时间
+  data?: any;                        // 额外数据（如金额、付款截图链接等）
+}

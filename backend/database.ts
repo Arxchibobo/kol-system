@@ -124,6 +124,23 @@ export async function initDB() {
         db.run(`CREATE INDEX IF NOT EXISTS idx_withdrawals_affiliate ON withdrawal_requests(affiliate_id);`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawal_requests(status);`);
 
+        // 6. 通知表
+        db.run(`
+            CREATE TABLE IF NOT EXISTS notifications (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                related_id TEXT,
+                is_read INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                data TEXT
+            );
+        `);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);`);
+
         // 保存数据库到文件
         saveDB();
 
@@ -1062,5 +1079,148 @@ export async function updateWithdrawalStatus(
     } catch (error) {
         console.error('[DB] 更新提现请求状态失败:', error);
         throw error;
+    }
+}
+
+// ----------------------------------------------------------------------
+// 通知 CRUD 操作
+// ----------------------------------------------------------------------
+
+// 创建通知
+export async function createNotification(notificationData: any) {
+    const database = await initDB();
+    try {
+        const dataJson = notificationData.data ? JSON.stringify(notificationData.data) : null;
+
+        database.run(
+            `INSERT INTO notifications (id, user_id, type, title, message, related_id, is_read, data, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [
+                notificationData.id,
+                notificationData.userId,
+                notificationData.type,
+                notificationData.title,
+                notificationData.message,
+                notificationData.relatedId || null,
+                notificationData.isRead ? 1 : 0,
+                dataJson
+            ]
+        );
+        saveDB();
+        console.log(`[DB] 通知创建成功: ${notificationData.id}`);
+        return { success: true, id: notificationData.id };
+    } catch (error) {
+        console.error('[DB] 创建通知失败:', error);
+        throw error;
+    }
+}
+
+// 获取用户的所有通知
+export async function getNotificationsByUser(userId: string) {
+    const database = await initDB();
+    try {
+        const result = database.exec(
+            `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC`,
+            [userId]
+        );
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const notification: any = {};
+            columns.forEach((col: string, index: number) => {
+                notification[col] = row[index];
+            });
+
+            // 字段名映射
+            if (notification.user_id !== undefined) {
+                notification.userId = notification.user_id;
+                delete notification.user_id;
+            }
+            if (notification.related_id !== undefined) {
+                notification.relatedId = notification.related_id;
+                delete notification.related_id;
+            }
+            if (notification.is_read !== undefined) {
+                notification.isRead = Boolean(notification.is_read);
+                delete notification.is_read;
+            }
+            if (notification.created_at !== undefined) {
+                notification.createdAt = notification.created_at;
+                delete notification.created_at;
+            }
+
+            // 解析 data JSON
+            if (notification.data) {
+                try {
+                    notification.data = JSON.parse(notification.data);
+                } catch (e) {
+                    console.error('[DB] 解析通知 data 失败:', e);
+                    notification.data = null;
+                }
+            }
+
+            return notification;
+        });
+    } catch (error) {
+        console.error('[DB] 获取用户通知失败:', error);
+        return [];
+    }
+}
+
+// 标记通知为已读
+export async function markNotificationAsRead(notificationId: string) {
+    const database = await initDB();
+    try {
+        database.run(
+            `UPDATE notifications SET is_read = 1 WHERE id = ?`,
+            [notificationId]
+        );
+        saveDB();
+        console.log(`[DB] 通知标记为已读: ${notificationId}`);
+        return { success: true };
+    } catch (error) {
+        console.error('[DB] 标记通知已读失败:', error);
+        throw error;
+    }
+}
+
+// 标记所有通知为已读
+export async function markAllNotificationsAsRead(userId: string) {
+    const database = await initDB();
+    try {
+        database.run(
+            `UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0`,
+            [userId]
+        );
+        saveDB();
+        console.log(`[DB] 用户 ${userId} 的所有通知已标记为已读`);
+        return { success: true };
+    } catch (error) {
+        console.error('[DB] 标记所有通知已读失败:', error);
+        throw error;
+    }
+}
+
+// 获取未读通知数量
+export async function getUnreadNotificationCount(userId: string): Promise<number> {
+    const database = await initDB();
+    try {
+        const result = database.exec(
+            `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0`,
+            [userId]
+        );
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return 0;
+        }
+
+        return Number(result[0].values[0][0]) || 0;
+    } catch (error) {
+        console.error('[DB] 获取未读通知数量失败:', error);
+        return 0;
     }
 }

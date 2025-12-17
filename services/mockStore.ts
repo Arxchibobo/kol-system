@@ -876,14 +876,17 @@ export const MockStore = {
     withdrawalId: string,
     status: string,
     paymentProof?: string,
-    adminNotes?: string
+    adminNotes?: string,
+    affiliateId?: string,
+    amount?: number,
+    taskTitle?: string
   ) => {
     try {
       console.log('[MockStore] 更新提现状态:', withdrawalId, '->', status);
       const response = await fetch(`/api/withdrawals/${withdrawalId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, paymentProof, adminNotes })
+        body: JSON.stringify({ status, paymentProof, adminNotes, affiliateId, amount, taskTitle })
       });
 
       if (!response.ok) {
@@ -922,6 +925,65 @@ export const MockStore = {
       console.log('[MockStore] ✅ 达人等级更新成功');
     } catch (error: any) {
       console.error('[MockStore] 更新达人等级失败:', error);
+      throw error;
+    }
+  },
+
+  // ----------------------------------------------------------------------
+  // 通知相关方法
+  // ----------------------------------------------------------------------
+
+  // 获取用户通知
+  getNotifications: async (userId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${userId}`);
+      if (!response.ok) throw new Error('获取通知失败');
+      const notifications = await response.json();
+      console.log('[MockStore] 获取通知:', notifications.length);
+      return notifications;
+    } catch (error: any) {
+      console.error('[MockStore] 获取通知失败:', error);
+      throw error;
+    }
+  },
+
+  // 获取未读通知数量
+  getUnreadNotificationCount: async (userId: string): Promise<number> => {
+    try {
+      const response = await fetch(`/api/notifications/${userId}/unread-count`);
+      if (!response.ok) throw new Error('获取未读通知数量失败');
+      const { count } = await response.json();
+      return count;
+    } catch (error: any) {
+      console.error('[MockStore] 获取未读通知数量失败:', error);
+      return 0;
+    }
+  },
+
+  // 标记通知为已读
+  markNotificationAsRead: async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+        method: 'PUT'
+      });
+      if (!response.ok) throw new Error('标记通知已读失败');
+      console.log('[MockStore] 通知已标记为已读:', notificationId);
+    } catch (error: any) {
+      console.error('[MockStore] 标记通知已读失败:', error);
+      throw error;
+    }
+  },
+
+  // 标记所有通知为已读
+  markAllNotificationsAsRead: async (userId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${userId}/read-all`, {
+        method: 'PUT'
+      });
+      if (!response.ok) throw new Error('标记所有通知已读失败');
+      console.log('[MockStore] 所有通知已标记为已读');
+    } catch (error: any) {
+      console.error('[MockStore] 标记所有通知已读失败:', error);
       throw error;
     }
   }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Task, TaskStatus, Settlement, Tier, UserRole, TIER_RATES, WithdrawalRequest, WithdrawalStatus } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload } from 'lucide-react';
+import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload, Settings as SettingsIcon } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -61,6 +61,18 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
   // 全局刷新状态
   const [refreshing, setRefreshing] = useState(false);
+
+  // 自动审核规则配置
+  const [showAutoReviewModal, setShowAutoReviewModal] = useState(false);
+  const [autoReviewRules, setAutoReviewRules] = useState({
+    enabled: false,
+    minAmount: 50, // 最低自动通过金额
+    maxAmount: 500, // 最高自动通过金额
+    requireVerifiedAccount: true, // 需要验证过的账号
+    minTasksCompleted: 3, // 至少完成3个任务
+    blacklistCheck: true, // 黑名单检查
+    autoApproveUnder: 100 // 小于此金额自动通过（如果满足其他条件）
+  });
 
   // 标签分类系统
   const AVAILABLE_TAGS = ['AI博主', '时尚博主', '生活博主', '科技博主', '游戏博主', '美食博主', '旅游博主', '其他'];
@@ -865,15 +877,250 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   );
 
   const handleUpdateWithdrawalStatus = async (withdrawalId: string, newStatus: WithdrawalStatus, paymentProof?: string, adminNotes?: string) => {
-    await MockStore.updateWithdrawalStatus(withdrawalId, newStatus, paymentProof, adminNotes);
+    // 找到对应的提现记录，传递完整信息以便后端创建通知
+    const withdrawal = withdrawals.find(w => w.id === withdrawalId);
+    if (withdrawal) {
+      await MockStore.updateWithdrawalStatus(
+        withdrawalId,
+        newStatus,
+        paymentProof,
+        adminNotes,
+        withdrawal.affiliateId,
+        withdrawal.amount,
+        withdrawal.taskTitle
+      );
+    } else {
+      await MockStore.updateWithdrawalStatus(withdrawalId, newStatus, paymentProof, adminNotes);
+    }
     const updatedWithdrawals = await MockStore.getAllWithdrawals();
     setWithdrawals(updatedWithdrawals);
   };
 
-  const renderWithdrawals = () => (
+  // 计算提现统计数据
+  const calculateWithdrawalStats = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    // 总提现金额
+    const totalAmount = withdrawals.reduce((sum, w) => sum + w.amount, 0);
+
+    // 已完成提现金额
+    const completedAmount = withdrawals
+      .filter(w => w.status === WithdrawalStatus.COMPLETED)
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    // 待处理金额
+    const pendingAmount = withdrawals
+      .filter(w => w.status === WithdrawalStatus.PENDING || w.status === WithdrawalStatus.PROCESSING)
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    // 本月提现金额
+    const monthlyAmount = withdrawals
+      .filter(w => {
+        const date = new Date(w.requestedAt);
+        return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+      })
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    // 本年提现金额
+    const yearlyAmount = withdrawals
+      .filter(w => {
+        const date = new Date(w.requestedAt);
+        return date.getFullYear() === currentYear;
+      })
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    // 月度统计（最近12个月）
+    const monthlyStats = [];
+    for (let i = 11; i >= 0; i--) {
+      const targetDate = new Date(currentYear, currentMonth - i, 1);
+      const targetYear = targetDate.getFullYear();
+      const targetMonth = targetDate.getMonth();
+
+      const amount = withdrawals
+        .filter(w => {
+          const date = new Date(w.requestedAt);
+          return date.getFullYear() === targetYear && date.getMonth() === targetMonth;
+        })
+        .reduce((sum, w) => sum + w.amount, 0);
+
+      monthlyStats.push({
+        month: `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`,
+        amount: amount,
+        count: withdrawals.filter(w => {
+          const date = new Date(w.requestedAt);
+          return date.getFullYear() === targetYear && date.getMonth() === targetMonth;
+        }).length
+      });
+    }
+
+    return {
+      totalAmount,
+      completedAmount,
+      pendingAmount,
+      monthlyAmount,
+      yearlyAmount,
+      monthlyStats,
+      totalCount: withdrawals.length,
+      completedCount: withdrawals.filter(w => w.status === WithdrawalStatus.COMPLETED).length,
+      pendingCount: withdrawals.filter(w => w.status === WithdrawalStatus.PENDING || w.status === WithdrawalStatus.PROCESSING).length
+    };
+  };
+
+  const renderWithdrawals = () => {
+    const stats = calculateWithdrawalStats();
+
+    return (
     <div className="space-y-6">
+        {/* 统计卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400">总提现金额</span>
+              <DollarSign size={20} className="text-blue-600 dark:text-blue-400" />
+            </div>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.totalAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.totalCount} 笔</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400">已完成金额</span>
+              <CheckCircle size={20} className="text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${stats.completedAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.completedCount} 笔</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400">待处理金额</span>
+              <Activity size={20} className="text-amber-600 dark:text-amber-400" />
+            </div>
+            <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">${stats.pendingAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.pendingCount} 笔</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400">本月提现</span>
+              <BarChart3 size={20} className="text-purple-600 dark:text-purple-400" />
+            </div>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.monthlyAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">本年: ${stats.yearlyAmount.toFixed(2)}</p>
+          </div>
+        </div>
+
+        {/* 月度趋势图 */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">提现趋势（最近12个月）</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={stats.monthlyStats}>
+              <defs>
+                <linearGradient id="withdrawalGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '12px' }} />
+              <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: theme === 'dark' ? '#1e293b' : '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px'
+                }}
+                formatter={(value: number) => [`$${value.toFixed(2)}`, '金额']}
+              />
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke="#10b981"
+                strokeWidth={2}
+                fill="url(#withdrawalGradient)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
         <div className="flex justify-between items-center">
              <h2 className="text-xl font-bold text-slate-900 dark:text-white">提现管理</h2>
+             <div className="flex gap-2">
+               {/* 导出按钮 */}
+               <button
+                 onClick={() => {
+                   // 生成CSV数据
+                   const csvContent = [
+                     ['达人姓名', '任务标题', '金额', '收款方式', '收款详情', '状态', '申请时间', '处理时间', '运营备注'],
+                     ...withdrawals.map(w => [
+                       w.affiliateName,
+                       w.taskTitle,
+                       w.amount.toFixed(2),
+                       w.paymentMethod,
+                       w.paymentDetails,
+                       w.status,
+                       new Date(w.requestedAt).toLocaleString('zh-CN'),
+                       w.processedAt ? new Date(w.processedAt).toLocaleString('zh-CN') : '',
+                       w.adminNotes || ''
+                     ])
+                   ].map(row => row.join(',')).join('\n');
+
+                   // 创建下载链接
+                   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                   const link = document.createElement('a');
+                   link.href = URL.createObjectURL(blob);
+                   link.download = `提现清单_${new Date().toISOString().split('T')[0]}.csv`;
+                   link.click();
+                 }}
+                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+               >
+                 <Upload size={16} /> 导出清单
+               </button>
+
+               {/* 批量打款按钮 */}
+               <button
+                 onClick={() => {
+                   const pendingWithdrawals = withdrawals.filter(w =>
+                     w.status === WithdrawalStatus.PENDING || w.status === WithdrawalStatus.PROCESSING
+                   );
+                   if (pendingWithdrawals.length === 0) {
+                     alert('没有待处理的提现');
+                     return;
+                   }
+                   const confirmed = window.confirm(
+                     `确定要批量处理 ${pendingWithdrawals.length} 笔提现吗？\n` +
+                     `总金额: $${pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}\n\n` +
+                     `所有提现将被标记为"处理中"状态。`
+                   );
+                   if (confirmed) {
+                     // 批量更新状态
+                     Promise.all(
+                       pendingWithdrawals.map(w =>
+                         handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.PROCESSING)
+                       )
+                     ).then(() => {
+                       alert('批量处理完成！');
+                     }).catch(error => {
+                       console.error('批量处理失败:', error);
+                       alert('批量处理失败，请重试');
+                     });
+                   }
+                 }}
+                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+               >
+                 <CheckCircle size={16} /> 批量打款
+               </button>
+
+               {/* 审核规则按钮 */}
+               <button
+                 onClick={() => setShowAutoReviewModal(true)}
+                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+               >
+                 <SettingsIcon size={16} /> 审核规则
+               </button>
+             </div>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden transition-colors">
             <table className="w-full text-left text-sm">
@@ -956,7 +1203,8 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
             </table>
         </div>
     </div>
-  );
+    );
+  };
 
   const renderSettlements = () => (
     <div className="space-y-6">
@@ -1747,6 +1995,126 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       </div>
 
       {/* 异常预警详情模态框 */}
+      {/* 自动审核规则弹窗 */}
+      {showAutoReviewModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAutoReviewModal(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">自动审核规则配置</h2>
+              <button onClick={() => setShowAutoReviewModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* 启用开关 */}
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <h3 className="font-medium text-slate-900 dark:text-white">启用自动审核</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">符合条件的提现将自动通过审核</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoReviewRules.enabled}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, enabled: e.target.checked})}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* 金额范围 */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-slate-900 dark:text-white">金额范围</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">最低金额 ($)</label>
+                    <input
+                      type="number"
+                      value={autoReviewRules.minAmount}
+                      onChange={(e) => setAutoReviewRules({...autoReviewRules, minAmount: Number(e.target.value)})}
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">最高金额 ($)</label>
+                    <input
+                      type="number"
+                      value={autoReviewRules.maxAmount}
+                      onChange={(e) => setAutoReviewRules({...autoReviewRules, maxAmount: Number(e.target.value)})}
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">小额自动通过 ($)</label>
+                  <input
+                    type="number"
+                    value={autoReviewRules.autoApproveUnder}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, autoApproveUnder: Number(e.target.value)})}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">低于此金额且满足其他条件的提现将自动通过</p>
+                </div>
+              </div>
+
+              {/* 风控条件 */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-slate-900 dark:text-white">风控条件</h3>
+                <div>
+                  <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">最少完成任务数</label>
+                  <input
+                    type="number"
+                    value={autoReviewRules.minTasksCompleted}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, minTasksCompleted: Number(e.target.value)})}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={autoReviewRules.requireVerifiedAccount}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, requireVerifiedAccount: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm text-slate-600 dark:text-slate-400">要求账号已验证</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={autoReviewRules.blacklistCheck}
+                    onChange={(e) => setAutoReviewRules({...autoReviewRules, blacklistCheck: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm text-slate-600 dark:text-slate-400">启用黑名单检查</span>
+                </label>
+              </div>
+
+              {/* 保存按钮 */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  onClick={() => setShowAutoReviewModal(false)}
+                  className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    // TODO: 保存规则到后端
+                    console.log('保存自动审核规则:', autoReviewRules);
+                    alert('规则已保存！');
+                    setShowAutoReviewModal(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  保存规则
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAnomaliesModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAnomaliesModal(false)}>
             <div className="bg-white dark:bg-slate-900 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
