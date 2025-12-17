@@ -466,6 +466,34 @@ export const MockStore = {
     return newAT;
   },
 
+  // 删除/释放已领取的任务
+  releaseTask: async (affiliateTaskId: string): Promise<void> => {
+    try {
+      console.log('[MockStore] 释放任务:', affiliateTaskId);
+      const response = await fetch(`/api/affiliate-tasks/${affiliateTaskId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '释放任务失败');
+      }
+
+      // 从本地数组中移除
+      const index = MOCK_AFFILIATE_TASKS.findIndex(at => at.id === affiliateTaskId);
+      if (index !== -1) {
+        MOCK_AFFILIATE_TASKS.splice(index, 1);
+        saveData();
+      }
+
+      console.log('[MockStore] ✅ 任务释放成功');
+    } catch (error: any) {
+      console.error('[MockStore] 释放任务失败:', error);
+      throw error;
+    }
+  },
+
   // Handle client-side redirection for fallback links
   handleClientRedirect: async (path: string): Promise<string | null> => {
       // Logic: 

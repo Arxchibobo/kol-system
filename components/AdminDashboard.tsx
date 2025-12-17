@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Task, TaskStatus, Settlement, Tier, UserRole, TIER_RATES, WithdrawalRequest, WithdrawalStatus } from '../types';
+import { User, Task, TaskStatus, Tier, UserRole, TIER_RATES, WithdrawalRequest, WithdrawalStatus } from '../types';
 import { MockStore } from '../services/mockStore';
 import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload, Settings as SettingsIcon } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -12,13 +12,12 @@ interface Props {
   user: User;
 }
 
-type Tab = 'OVERVIEW' | 'TASKS' | 'AFFILIATES' | 'WITHDRAWALS' | 'SETTLEMENTS';
+type Tab = 'OVERVIEW' | 'TASKS' | 'AFFILIATES' | 'WITHDRAWALS';
 
 export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<any[]>([]);
-  const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -132,14 +131,12 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       const taskList = await MockStore.getTasks(user.role);
       console.log('[运营端] 获取到的任务列表:', taskList.length, taskList);
       const s = await MockStore.getStats(user.id, user.role);
-      const sett = await MockStore.getSettlements();
       const aff = await MockStore.getAffiliates();
       const ov = await MockStore.getAdminOverviewStats();
       const withdrawalList = await MockStore.getAllWithdrawals();
 
       setTasks(taskList);
       setStats(s);
-      setSettlements(sett);
       setAffiliates(aff);
       setOverviewData(ov);
       setWithdrawals(withdrawalList);
@@ -563,7 +560,6 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
             { id: 'TASKS', icon: FileText, label: t('admin.tasks') },
             { id: 'AFFILIATES', icon: Users, label: t('admin.affiliates') },
             { id: 'WITHDRAWALS', icon: Wallet, label: '提现管理' },
-            { id: 'SETTLEMENTS', icon: DollarSign, label: t('admin.settlements') },
         ].map((item) => (
             <button
                 key={item.id}
@@ -1205,45 +1201,6 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     </div>
     );
   };
-
-  const renderSettlements = () => (
-    <div className="space-y-6">
-        <div className="flex justify-between items-center">
-             <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('admin.financialSettlements')}</h2>
-             <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium">
-                <CheckCircle size={16} /> {t('admin.processPayment')}
-             </button>
-        </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden transition-colors">
-            <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
-                    <tr>
-                        <th className="px-6 py-4 font-medium">{t('admin.tableAffiliate')}</th>
-                        <th className="px-6 py-4 font-medium">{t('admin.tablePeriod')}</th>
-                        <th className="px-6 py-4 font-medium">{t('admin.tableAmount')}</th>
-                        <th className="px-6 py-4 font-medium">{t('admin.tableStatus')}</th>
-                        <th className="px-6 py-4 font-medium">{t('admin.tableTransaction')}</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {settlements.map(s => (
-                        <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{s.affiliateName}</td>
-                            <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{s.period}</td>
-                            <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-mono font-medium">${s.amount.toLocaleString()}</td>
-                            <td className="px-6 py-4">
-                                <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}`}>
-                                    {s.status}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 text-slate-500 font-mono text-xs">{s.transactionHash}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </div>
-  );
 
   const renderAffiliates = () => {
     // 根据搜索和标签筛选达人
@@ -1991,7 +1948,6 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         {activeTab === 'TASKS' && renderTasks()}
         {activeTab === 'AFFILIATES' && renderAffiliates()}
         {activeTab === 'WITHDRAWALS' && renderWithdrawals()}
-        {activeTab === 'SETTLEMENTS' && renderSettlements()}
       </div>
 
       {/* 异常预警详情模态框 */}

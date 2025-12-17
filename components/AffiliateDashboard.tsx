@@ -262,12 +262,16 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
   };
   
   const handleGiveUp = async (affTaskId: string) => {
-      if (window.confirm(t('affiliate.confirmGiveUp'))) {
-          await MockStore.giveUpTask(affTaskId);
-          // Reload data to refresh Available Tasks list（不阻塞UI）
-          loadData().catch(err => {
-            console.error('[前端] 放弃任务后刷新数据失败:', err);
-          });
+      if (window.confirm('确定要放弃这个任务吗？此操作不可撤销。')) {
+          try {
+            await MockStore.releaseTask(affTaskId);
+            alert('任务已成功释放');
+            // 重新加载数据以刷新可用任务列表
+            await loadData();
+          } catch (error: any) {
+            console.error('[前端] 放弃任务失败:', error);
+            alert('放弃任务失败: ' + error.message);
+          }
       }
   };
 

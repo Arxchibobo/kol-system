@@ -407,6 +407,29 @@ app.delete('/api/tasks/:taskId', async (req, res) => {
     }
 });
 
+// 删除/释放达人已领取的任务
+app.delete('/api/affiliate-tasks/:affiliateTaskId', async (req, res) => {
+    try {
+        const { affiliateTaskId } = req.params;
+        console.log(`[API] 释放达人任务请求: ${affiliateTaskId}`);
+
+        const { deleteAffiliateTask } = await import('./database.js');
+        await deleteAffiliateTask(affiliateTaskId);
+
+        console.log(`[API] ✅ 达人任务释放成功: ${affiliateTaskId}`);
+        res.json({
+            success: true,
+            message: '任务释放成功'
+        });
+    } catch (error: any) {
+        console.error('[API] 释放达人任务错误:', error);
+        res.status(500).json({
+            error: '释放任务失败',
+            message: error.message || '未知错误'
+        });
+    }
+});
+
 // ----------------------------------------------------------------------
 // 提现请求 API
 // ----------------------------------------------------------------------

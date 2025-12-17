@@ -646,6 +646,26 @@ export async function deleteTaskCascade(taskId: string): Promise<{
     }
 }
 
+// 删除达人已领取的任务
+export async function deleteAffiliateTask(affiliateTaskId: string): Promise<void> {
+    const database = await initDB();
+    try {
+        console.log(`[DB] 删除达人任务: ${affiliateTaskId}`);
+
+        // 删除该任务的所有点击记录
+        database.run(`DELETE FROM clicks WHERE affiliate_task_id = ?`, [affiliateTaskId]);
+
+        // 删除该达人任务
+        database.run(`DELETE FROM affiliate_tasks WHERE id = ?`, [affiliateTaskId]);
+
+        saveDB();
+        console.log(`[DB] ✅ 达人任务删除成功`);
+    } catch (error) {
+        console.error('[DB] 删除达人任务失败:', error);
+        throw error;
+    }
+}
+
 // ----------------------------------------------------------------------
 // 任务 CRUD 操作
 // ----------------------------------------------------------------------
