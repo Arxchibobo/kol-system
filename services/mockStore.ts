@@ -801,5 +801,128 @@ export const MockStore = {
       saveData();
       console.log(`[MockStore] 更新用户 ${userId} 通知设置:`, settings);
     }
+  },
+
+  // ----------------------------------------------------------------------
+  // 提现相关方法
+  // ----------------------------------------------------------------------
+
+  // 创建提现请求
+  createWithdrawalRequest: async (data: {
+    affiliateId: string;
+    affiliateName: string;
+    affiliateTaskId: string;
+    taskTitle: string;
+    amount: number;
+    paymentMethod: string;
+    paymentDetails: string;
+  }) => {
+    try {
+      console.log('[MockStore] 创建提现请求:', data);
+      const response = await fetch('/api/withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '创建提现请求失败');
+      }
+
+      const result = await response.json();
+      console.log('[MockStore] ✅ 提现请求创建成功:', result);
+      return result;
+    } catch (error: any) {
+      console.error('[MockStore] 创建提现请求失败:', error);
+      throw error;
+    }
+  },
+
+  // 获取所有提现请求（运营侧）
+  getAllWithdrawals: async () => {
+    try {
+      const response = await fetch('/api/withdrawals');
+      if (!response.ok) {
+        throw new Error('获取提现请求失败');
+      }
+      const withdrawals = await response.json();
+      console.log('[MockStore] 获取到提现请求:', withdrawals.length);
+      return withdrawals;
+    } catch (error: any) {
+      console.error('[MockStore] 获取提现请求失败:', error);
+      return [];
+    }
+  },
+
+  // 获取达人的提现记录
+  getAffiliateWithdrawals: async (affiliateId: string) => {
+    try {
+      const response = await fetch(`/api/withdrawals/affiliate/${affiliateId}`);
+      if (!response.ok) {
+        throw new Error('获取提现记录失败');
+      }
+      const withdrawals = await response.json();
+      console.log('[MockStore] 获取达人提现记录:', withdrawals.length);
+      return withdrawals;
+    } catch (error: any) {
+      console.error('[MockStore] 获取达人提现记录失败:', error);
+      return [];
+    }
+  },
+
+  // 更新提现状态
+  updateWithdrawalStatus: async (
+    withdrawalId: string,
+    status: string,
+    paymentProof?: string,
+    adminNotes?: string
+  ) => {
+    try {
+      console.log('[MockStore] 更新提现状态:', withdrawalId, '->', status);
+      const response = await fetch(`/api/withdrawals/${withdrawalId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, paymentProof, adminNotes })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '更新提现状态失败');
+      }
+
+      const result = await response.json();
+      console.log('[MockStore] ✅ 提现状态更新成功:', result);
+      return result;
+    } catch (error: any) {
+      console.error('[MockStore] 更新提现状态失败:', error);
+      throw error;
+    }
+  },
+
+  // 更新达人等级（运营侧）
+  updateAffiliateTier: async (userId: string, tier: string) => {
+    try {
+      console.log('[MockStore] 更新达人等级:', userId, '->', tier);
+
+      // 更新本地用户对象
+      const user = MOCK_AFFILIATES.find(u => u.id === userId);
+      if (user) {
+        user.tier = tier as any;
+      }
+
+      // 同步到数据库
+      await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, tier })
+      });
+
+      saveData();
+      console.log('[MockStore] ✅ 达人等级更新成功');
+    } catch (error: any) {
+      console.error('[MockStore] 更新达人等级失败:', error);
+      throw error;
+    }
   }
 };
