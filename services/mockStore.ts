@@ -206,7 +206,7 @@ export const MockStore = {
         email: data.email,
         role: UserRole.AFFILIATE,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`,
-        tier: Tier.BRONZE,
+        tier: Tier.CORE_PARTNER, // 默认设置为基础合作伙伴
         totalEarnings: 0,
         pendingEarnings: 0,
         totalClicks: 0,
@@ -318,7 +318,7 @@ export const MockStore = {
           email: email,
           role: UserRole.AFFILIATE,
           avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'U')}&background=random`,
-          tier: userData.tier || Tier.BRONZE,
+          tier: userData.tier || Tier.CORE_PARTNER,
           totalEarnings: userData.totalEarnings || 0,
           pendingEarnings: userData.pendingEarnings || 0,
           totalClicks: userData.totalClicks || 0,
@@ -541,7 +541,7 @@ export const MockStore = {
                   if (user) {
                       user.totalClicks = (user.totalClicks || 0) + 1;
                       user.validClicks = (user.validClicks || 0) + 1;
-                      const rate = TIER_RATES[user.tier || Tier.BRONZE];
+                      const rate = TIER_RATES[user.tier || Tier.CORE_PARTNER];
                       const earning = rate / 1000;
                       user.totalEarnings = (user.totalEarnings || 0) + earning;
                       user.pendingEarnings = (user.pendingEarnings || 0) + earning;
@@ -592,7 +592,7 @@ export const MockStore = {
             if (user) {
                 user.totalClicks = (user.totalClicks || 0) + 1;
                 user.validClicks = (user.validClicks || 0) + 1;
-                const rate = TIER_RATES[user.tier || Tier.BRONZE];
+                const rate = TIER_RATES[user.tier || Tier.CORE_PARTNER];
                 user.totalEarnings = (user.totalEarnings || 0) + (rate / 1000);
                 user.pendingEarnings = (user.pendingEarnings || 0) + (rate / 1000);
                 affTask.stats.estimatedEarnings += (rate / 1000);

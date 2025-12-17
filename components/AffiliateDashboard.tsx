@@ -650,7 +650,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
                         {t(tierKey)}
                     </div>
                     <p className="text-sm text-slate-500 mt-2">
-                        {t('affiliate.earnRate', { rate: TIER_RATES[dashboardUser.tier || Tier.BRONZE] })}
+                        {t('affiliate.earnRate', { rate: TIER_RATES[dashboardUser.tier || Tier.CORE_PARTNER] })}
                     </p>
                 </div>
                 <div className="text-right">
