@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Task, TaskStatus, Settlement, Tier, UserRole } from '../types';
+import { User, Task, TaskStatus, Settlement, Tier, UserRole, TIER_RATES, WithdrawalRequest, WithdrawalStatus } from '../types';
 import { MockStore } from '../services/mockStore';
 import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -12,13 +12,14 @@ interface Props {
   user: User;
 }
 
-type Tab = 'OVERVIEW' | 'TASKS' | 'AFFILIATES' | 'SETTLEMENTS';
+type Tab = 'OVERVIEW' | 'TASKS' | 'AFFILIATES' | 'WITHDRAWALS' | 'SETTLEMENTS';
 
 export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<any[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const { t } = useLanguage();
   const { theme } = useTheme();
   
@@ -28,8 +29,18 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   // New Task / Edit Task Form State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [newTask, setNewTask] = useState<Partial<Task>>({ title: '', description: '', productLink: '', rewardRate: 50 });
-  
+  const [newTask, setNewTask] = useState<Partial<Task>>({
+    title: '',
+    description: '',
+    productLink: '',
+    isSpecialReward: false,
+    specialRewards: {
+      CORE_PARTNER: TIER_RATES[Tier.CORE_PARTNER],
+      PREMIUM_INFLUENCER: TIER_RATES[Tier.PREMIUM_INFLUENCER],
+      OFFICIAL_COLLABORATOR: TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
+    }
+  });
+
   // Dedicated form states for complex fields
   const [formDeadline, setFormDeadline] = useState('');
   const [formRequirements, setFormRequirements] = useState('');
@@ -60,7 +71,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [newKol, setNewKol] = useState<Partial<User>>({
     name: '',
     email: '',
-    tier: Tier.BRONZE,
+    tier: Tier.CORE_PARTNER,
     followerCount: 0,
     tags: [],
     socialLinks: { twitter: '', youtube: '', instagram: '', tiktok: '' }
@@ -112,12 +123,14 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       const sett = await MockStore.getSettlements();
       const aff = await MockStore.getAffiliates();
       const ov = await MockStore.getAdminOverviewStats();
+      const withdrawalList = await MockStore.getAllWithdrawals();
 
       setTasks(taskList);
       setStats(s);
       setSettlements(sett);
       setAffiliates(aff);
       setOverviewData(ov);
+      setWithdrawals(withdrawalList);
 
       // 获取真实数据
       await fetchRealTotalStats();
@@ -151,14 +164,24 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
   const openCreateModal = () => {
       setEditingTaskId(null);
-      setNewTask({ title: '', description: '', productLink: '', rewardRate: 50 });
-      
+      setNewTask({
+        title: '',
+        description: '',
+        productLink: '',
+        isSpecialReward: false,
+        specialRewards: {
+          CORE_PARTNER: TIER_RATES[Tier.CORE_PARTNER],
+          PREMIUM_INFLUENCER: TIER_RATES[Tier.PREMIUM_INFLUENCER],
+          OFFICIAL_COLLABORATOR: TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
+        }
+      });
+
       // Default deadline: 30 days from now
       const d = new Date();
       d.setDate(d.getDate() + 30);
       setFormDeadline(d.toISOString().split('T')[0]);
       setFormRequirements('');
-      
+
       setShowCreateModal(true);
   };
 
@@ -218,7 +241,17 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setTasks([...updatedTasks]); // Force update
     setShowCreateModal(false);
     setEditingTaskId(null);
-    setNewTask({ title: '', description: '', productLink: '', rewardRate: 50 });
+    setNewTask({
+      title: '',
+      description: '',
+      productLink: '',
+      isSpecialReward: false,
+      specialRewards: {
+        CORE_PARTNER: TIER_RATES[Tier.CORE_PARTNER],
+        PREMIUM_INFLUENCER: TIER_RATES[Tier.PREMIUM_INFLUENCER],
+        OFFICIAL_COLLABORATOR: TIER_RATES[Tier.OFFICIAL_COLLABORATOR]
+      }
+    });
   };
 
   const handleStopTask = async (taskId: string) => {
@@ -393,7 +426,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setNewKol({
         name: '',
         email: '',
-        tier: Tier.BRONZE,
+        tier: Tier.CORE_PARTNER,
         followerCount: 0,
         tags: [],
         socialLinks: { twitter: '', youtube: '', instagram: '', tiktok: '' }
@@ -517,6 +550,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
             { id: 'OVERVIEW', icon: LayoutGrid, label: t('admin.overview') },
             { id: 'TASKS', icon: FileText, label: t('admin.tasks') },
             { id: 'AFFILIATES', icon: Users, label: t('admin.affiliates') },
+            { id: 'WITHDRAWALS', icon: Wallet, label: '提现管理' },
             { id: 'SETTLEMENTS', icon: DollarSign, label: t('admin.settlements') },
         ].map((item) => (
             <button
@@ -712,16 +746,87 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">奖励金额 ($/1000次点击)</label>
-                            <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                                value={newTask.rewardRate || 0}
-                                onChange={e => setNewTask({...newTask, rewardRate: parseInt(e.target.value) || 0})}
-                            />
+                        <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50 dark:bg-slate-950">
+                            <div className="flex items-center gap-3 mb-3">
+                                <input
+                                    type="checkbox"
+                                    id="specialReward"
+                                    checked={newTask.isSpecialReward || false}
+                                    onChange={e => setNewTask({...newTask, isSpecialReward: e.target.checked})}
+                                    className="w-4 h-4 text-indigo-600 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 rounded focus:ring-indigo-500"
+                                />
+                                <label htmlFor="specialReward" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                    使用特殊奖励金额
+                                </label>
+                            </div>
+
+                            {!newTask.isSpecialReward && (
+                                <div className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
+                                    <p className="font-medium">默认奖励标准:</p>
+                                    <ul className="list-disc list-inside space-y-1 ml-2">
+                                        <li>基础合作伙伴: ${TIER_RATES[Tier.CORE_PARTNER]}/1000点击</li>
+                                        <li>高级影响者: ${TIER_RATES[Tier.PREMIUM_INFLUENCER]}/1000点击</li>
+                                        <li>官方合作者: ${TIER_RATES[Tier.OFFICIAL_COLLABORATOR]}/1000点击</li>
+                                    </ul>
+                                </div>
+                            )}
+
+                            {newTask.isSpecialReward && (
+                                <div className="space-y-3 mt-2">
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">自定义奖励金额 ($/1000次点击):</p>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">基础合作伙伴</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                            value={newTask.specialRewards?.CORE_PARTNER || TIER_RATES[Tier.CORE_PARTNER]}
+                                            onChange={e => setNewTask({
+                                                ...newTask,
+                                                specialRewards: {
+                                                    ...newTask.specialRewards!,
+                                                    CORE_PARTNER: parseInt(e.target.value) || 0
+                                                }
+                                            })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">高级影响者</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                            value={newTask.specialRewards?.PREMIUM_INFLUENCER || TIER_RATES[Tier.PREMIUM_INFLUENCER]}
+                                            onChange={e => setNewTask({
+                                                ...newTask,
+                                                specialRewards: {
+                                                    ...newTask.specialRewards!,
+                                                    PREMIUM_INFLUENCER: parseInt(e.target.value) || 0
+                                                }
+                                            })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">官方合作者</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                            value={newTask.specialRewards?.OFFICIAL_COLLABORATOR || TIER_RATES[Tier.OFFICIAL_COLLABORATOR]}
+                                            onChange={e => setNewTask({
+                                                ...newTask,
+                                                specialRewards: {
+                                                    ...newTask.specialRewards!,
+                                                    OFFICIAL_COLLABORATOR: parseInt(e.target.value) || 0
+                                                }
+                                            })}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
@@ -756,6 +861,100 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                 </div>
             </div>
         )}
+    </div>
+  );
+
+  const handleUpdateWithdrawalStatus = async (withdrawalId: string, newStatus: WithdrawalStatus, paymentProof?: string, adminNotes?: string) => {
+    await MockStore.updateWithdrawalStatus(withdrawalId, newStatus, paymentProof, adminNotes);
+    const updatedWithdrawals = await MockStore.getAllWithdrawals();
+    setWithdrawals(updatedWithdrawals);
+  };
+
+  const renderWithdrawals = () => (
+    <div className="space-y-6">
+        <div className="flex justify-between items-center">
+             <h2 className="text-xl font-bold text-slate-900 dark:text-white">提现管理</h2>
+        </div>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden transition-colors">
+            <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                        <th className="px-6 py-4 font-medium">达人</th>
+                        <th className="px-6 py-4 font-medium">任务</th>
+                        <th className="px-6 py-4 font-medium">金额</th>
+                        <th className="px-6 py-4 font-medium">收款方式</th>
+                        <th className="px-6 py-4 font-medium">状态</th>
+                        <th className="px-6 py-4 font-medium">申请时间</th>
+                        <th className="px-6 py-4 font-medium">操作</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {withdrawals.length === 0 ? (
+                        <tr>
+                            <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                暂无提现申请
+                            </td>
+                        </tr>
+                    ) : (
+                        withdrawals.map((w: WithdrawalRequest) => (
+                            <tr key={w.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{w.affiliateName}</td>
+                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{w.taskTitle}</td>
+                                <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-mono font-medium">${w.amount.toFixed(2)}</td>
+                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{w.paymentMethod}</td>
+                                <td className="px-6 py-4">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                        w.status === WithdrawalStatus.COMPLETED ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                        w.status === WithdrawalStatus.PROCESSING ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                                        w.status === WithdrawalStatus.REJECTED ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                                        'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                    }`}>
+                                        {w.status}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
+                                    {new Date(w.requestedAt).toLocaleDateString('zh-CN')}
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex gap-2">
+                                        {w.status === WithdrawalStatus.PENDING && (
+                                            <>
+                                                <button
+                                                    onClick={() => handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.PROCESSING)}
+                                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium"
+                                                >
+                                                    处理中
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const notes = prompt('拒绝原因:');
+                                                        if (notes) handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.REJECTED, undefined, notes);
+                                                    }}
+                                                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium"
+                                                >
+                                                    拒绝
+                                                </button>
+                                            </>
+                                        )}
+                                        {w.status === WithdrawalStatus.PROCESSING && (
+                                            <button
+                                                onClick={() => {
+                                                    const proof = prompt('付款截图URL:');
+                                                    if (proof) handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.COMPLETED, proof);
+                                                }}
+                                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-medium"
+                                            >
+                                                标记完成
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+        </div>
     </div>
   );
 
@@ -970,10 +1169,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase 
-                                                ${aff.tier === Tier.GOLD ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' : 
-                                                  aff.tier === Tier.SILVER ? 'bg-slate-200 dark:bg-slate-200/10 text-slate-600 dark:text-slate-300' : 
-                                                  'bg-amber-700/10 text-amber-600 dark:text-amber-600'}`}>
+                                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase
+                                                ${aff.tier === Tier.OFFICIAL_COLLABORATOR ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                                                  aff.tier === Tier.PREMIUM_INFLUENCER ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
+                                                  'bg-blue-500/10 text-blue-600 dark:text-blue-400'}`}>
                                                 {t(tierKey)}
                                             </span>
                                         </td>
@@ -1043,9 +1242,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                                     onChange={(e) => handleUpdateTier(aff, e.target.value as Tier)}
                                                                     className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                                                                 >
-                                                                    <option value={Tier.BRONZE}>{t('admin.tierBronze')}</option>
-                                                                    <option value={Tier.SILVER}>{t('admin.tierSilver')}</option>
-                                                                    <option value={Tier.GOLD}>{t('admin.tierGold')}</option>
+                                                                    <option value={Tier.CORE_PARTNER}>基础合作伙伴 ($50/1000)</option>
+                                                                    <option value={Tier.PREMIUM_INFLUENCER}>高级影响者 ($80/1000)</option>
+                                                                    <option value={Tier.OFFICIAL_COLLABORATOR}>官方合作者 ($100/1000)</option>
                                                                 </select>
                                                             </div>
                                                         </div>
@@ -1201,14 +1400,14 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{t('admin.labelTier')}</label>
-                                    <select 
+                                    <select
                                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                                         value={newKol.tier}
                                         onChange={e => setNewKol({...newKol, tier: e.target.value as Tier})}
                                     >
-                                        <option value={Tier.BRONZE}>{t('admin.tierBronze')}</option>
-                                        <option value={Tier.SILVER}>{t('admin.tierSilver')}</option>
-                                        <option value={Tier.GOLD}>{t('admin.tierGold')}</option>
+                                        <option value={Tier.CORE_PARTNER}>基础合作伙伴 ($50/1000)</option>
+                                        <option value={Tier.PREMIUM_INFLUENCER}>高级影响者 ($80/1000)</option>
+                                        <option value={Tier.OFFICIAL_COLLABORATOR}>官方合作者 ($100/1000)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -1431,9 +1630,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                             </td>
                                             <td className="px-4 py-2">
                                                 <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                                                    user.tier === Tier.GOLD ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
-                                                    user.tier === Tier.SILVER ? 'bg-slate-200 dark:bg-slate-200/10 text-slate-600 dark:text-slate-300' :
-                                                    'bg-amber-700/10 text-amber-600 dark:text-amber-600'
+                                                    user.tier === Tier.OFFICIAL_COLLABORATOR ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                                                    user.tier === Tier.PREMIUM_INFLUENCER ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
+                                                    'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                                                 }`}>
                                                     {user.tier}
                                                 </span>
@@ -1543,6 +1742,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         {activeTab === 'OVERVIEW' && renderOverview()}
         {activeTab === 'TASKS' && renderTasks()}
         {activeTab === 'AFFILIATES' && renderAffiliates()}
+        {activeTab === 'WITHDRAWALS' && renderWithdrawals()}
         {activeTab === 'SETTLEMENTS' && renderSettlements()}
       </div>
 

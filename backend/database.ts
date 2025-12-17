@@ -91,7 +91,8 @@ export async function initDB() {
                 title TEXT NOT NULL,
                 description TEXT,
                 product_link TEXT,
-                reward_per_click REAL DEFAULT 0,
+                is_special_reward INTEGER DEFAULT 0,
+                special_rewards TEXT,
                 status TEXT DEFAULT 'ACTIVE',
                 deadline TEXT,
                 requirements TEXT,
@@ -653,9 +654,18 @@ export async function getAllTasks() {
                 task.productLink = task.product_link;
                 delete task.product_link;
             }
-            if (task.reward_per_click !== undefined) {
-                task.rewardRate = task.reward_per_click;
-                delete task.reward_per_click;
+            if (task.is_special_reward !== undefined) {
+                task.isSpecialReward = Boolean(task.is_special_reward);
+                delete task.is_special_reward;
+            }
+            if (task.special_rewards !== undefined && task.special_rewards) {
+                try {
+                    task.specialRewards = JSON.parse(task.special_rewards);
+                } catch (e) {
+                    console.error('[DB] 解析 special_rewards 失败:', e);
+                    task.specialRewards = null;
+                }
+                delete task.special_rewards;
             }
             if (task.created_at !== undefined) {
                 task.createdAt = task.created_at;
@@ -695,15 +705,21 @@ export async function createTask(taskData: any) {
             ? JSON.stringify(taskData.requirements)
             : (taskData.requirements || '[]');
 
+        // 将 specialRewards 对象转为 JSON 字符串
+        const specialRewardsJson = taskData.specialRewards
+            ? JSON.stringify(taskData.specialRewards)
+            : null;
+
         database.run(
-            `INSERT INTO tasks (id, title, description, product_link, reward_per_click, status, deadline, requirements, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            `INSERT INTO tasks (id, title, description, product_link, is_special_reward, special_rewards, status, deadline, requirements, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
             [
                 taskData.id,
                 taskData.title,
                 taskData.description || '',
                 taskData.productLink || '',
-                taskData.rewardRate || 0,  // 使用 rewardRate 而不是 rewardPerClick
+                taskData.isSpecialReward ? 1 : 0,
+                specialRewardsJson,
                 taskData.status || 'ACTIVE',
                 taskData.deadline || null,
                 requirementsJson
@@ -727,16 +743,22 @@ export async function updateTask(taskId: string, taskData: any) {
             ? JSON.stringify(taskData.requirements)
             : (taskData.requirements || '[]');
 
+        // 将 specialRewards 对象转为 JSON 字符串
+        const specialRewardsJson = taskData.specialRewards
+            ? JSON.stringify(taskData.specialRewards)
+            : null;
+
         database.run(
             `UPDATE tasks
-             SET title = ?, description = ?, product_link = ?, reward_per_click = ?,
+             SET title = ?, description = ?, product_link = ?, is_special_reward = ?, special_rewards = ?,
                  status = ?, deadline = ?, requirements = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
             [
                 taskData.title,
                 taskData.description || '',
                 taskData.productLink || '',
-                taskData.rewardRate || 0,  // 使用 rewardRate 而不是 rewardPerClick
+                taskData.isSpecialReward ? 1 : 0,
+                specialRewardsJson,
                 taskData.status || 'ACTIVE',
                 taskData.deadline || null,
                 requirementsJson,
@@ -773,9 +795,18 @@ export async function getTaskById(taskId: string) {
             task.productLink = task.product_link;
             delete task.product_link;
         }
-        if (task.reward_per_click !== undefined) {
-            task.rewardRate = task.reward_per_click;
-            delete task.reward_per_click;
+        if (task.is_special_reward !== undefined) {
+            task.isSpecialReward = Boolean(task.is_special_reward);
+            delete task.is_special_reward;
+        }
+        if (task.special_rewards !== undefined && task.special_rewards) {
+            try {
+                task.specialRewards = JSON.parse(task.special_rewards);
+            } catch (e) {
+                console.error('[DB] 解析 special_rewards 失败:', e);
+                task.specialRewards = null;
+            }
+            delete task.special_rewards;
         }
         if (task.created_at !== undefined) {
             task.createdAt = task.created_at;

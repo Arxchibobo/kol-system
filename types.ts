@@ -66,7 +66,12 @@ export interface Task {
   title: string;
   description: string;
   productLink: string;
-  rewardRate: number; // e.g., 50 (dollars per 1000 clicks)
+  isSpecialReward: boolean; // Whether using custom special rewards or default TIER_RATES
+  specialRewards?: {
+    CORE_PARTNER: number;
+    PREMIUM_INFLUENCER: number;
+    OFFICIAL_COLLABORATOR: number;
+  }; // Custom reward rates per tier (dollars per 1000 clicks)
   status: TaskStatus;
   createdAt: string;
   deadline: string;
