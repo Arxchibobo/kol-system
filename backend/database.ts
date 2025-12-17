@@ -101,6 +101,28 @@ export async function initDB() {
         `);
         db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);`);
 
+        // 5. 提现记录表
+        db.run(`
+            CREATE TABLE IF NOT EXISTS withdrawal_requests (
+                id TEXT PRIMARY KEY,
+                affiliate_id TEXT NOT NULL,
+                affiliate_name TEXT NOT NULL,
+                affiliate_task_id TEXT NOT NULL,
+                task_title TEXT NOT NULL,
+                amount REAL NOT NULL,
+                payment_method TEXT NOT NULL,
+                payment_details TEXT NOT NULL,
+                status TEXT DEFAULT 'PENDING',
+                requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                processed_at DATETIME,
+                completed_at DATETIME,
+                payment_proof TEXT,
+                admin_notes TEXT
+            );
+        `);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_withdrawals_affiliate ON withdrawal_requests(affiliate_id);`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawal_requests(status);`);
+
         // 保存数据库到文件
         saveDB();
 
@@ -780,5 +802,234 @@ export async function getTaskById(taskId: string) {
     } catch (error) {
         console.error('[DB] 获取任务失败:', error);
         return null;
+    }
+}
+
+// ----------------------------------------------------------------------
+// 提现记录 CRUD 操作
+// ----------------------------------------------------------------------
+
+// 创建提现请求
+export async function createWithdrawalRequest(data: any) {
+    const database = await initDB();
+    try {
+        database.run(
+            `INSERT INTO withdrawal_requests
+             (id, affiliate_id, affiliate_name, affiliate_task_id, task_title, amount,
+              payment_method, payment_details, status, requested_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [
+                data.id,
+                data.affiliateId,
+                data.affiliateName,
+                data.affiliateTaskId,
+                data.taskTitle,
+                data.amount,
+                data.paymentMethod,
+                data.paymentDetails,
+                'PENDING'
+            ]
+        );
+        saveDB();
+        console.log(`[DB] 提现请求创建成功: ${data.id}`);
+        return { success: true, id: data.id };
+    } catch (error) {
+        console.error('[DB] 创建提现请求失败:', error);
+        throw error;
+    }
+}
+
+// 获取所有提现请求
+export async function getAllWithdrawalRequests() {
+    const database = await initDB();
+    try {
+        const result = database.exec(
+            `SELECT * FROM withdrawal_requests ORDER BY requested_at DESC`
+        );
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const withdrawal: any = {};
+            columns.forEach((col: string, index: number) => {
+                withdrawal[col] = row[index];
+            });
+
+            // 字段名映射
+            if (withdrawal.affiliate_id !== undefined) {
+                withdrawal.affiliateId = withdrawal.affiliate_id;
+                delete withdrawal.affiliate_id;
+            }
+            if (withdrawal.affiliate_name !== undefined) {
+                withdrawal.affiliateName = withdrawal.affiliate_name;
+                delete withdrawal.affiliate_name;
+            }
+            if (withdrawal.affiliate_task_id !== undefined) {
+                withdrawal.affiliateTaskId = withdrawal.affiliate_task_id;
+                delete withdrawal.affiliate_task_id;
+            }
+            if (withdrawal.task_title !== undefined) {
+                withdrawal.taskTitle = withdrawal.task_title;
+                delete withdrawal.task_title;
+            }
+            if (withdrawal.payment_method !== undefined) {
+                withdrawal.paymentMethod = withdrawal.payment_method;
+                delete withdrawal.payment_method;
+            }
+            if (withdrawal.payment_details !== undefined) {
+                withdrawal.paymentDetails = withdrawal.payment_details;
+                delete withdrawal.payment_details;
+            }
+            if (withdrawal.requested_at !== undefined) {
+                withdrawal.requestedAt = withdrawal.requested_at;
+                delete withdrawal.requested_at;
+            }
+            if (withdrawal.processed_at !== undefined) {
+                withdrawal.processedAt = withdrawal.processed_at;
+                delete withdrawal.processed_at;
+            }
+            if (withdrawal.completed_at !== undefined) {
+                withdrawal.completedAt = withdrawal.completed_at;
+                delete withdrawal.completed_at;
+            }
+            if (withdrawal.payment_proof !== undefined) {
+                withdrawal.paymentProof = withdrawal.payment_proof;
+                delete withdrawal.payment_proof;
+            }
+            if (withdrawal.admin_notes !== undefined) {
+                withdrawal.adminNotes = withdrawal.admin_notes;
+                delete withdrawal.admin_notes;
+            }
+
+            return withdrawal;
+        });
+    } catch (error) {
+        console.error('[DB] 获取提现请求失败:', error);
+        return [];
+    }
+}
+
+// 获取达人的提现请求
+export async function getWithdrawalRequestsByAffiliate(affiliateId: string) {
+    const database = await initDB();
+    try {
+        const result = database.exec(
+            `SELECT * FROM withdrawal_requests WHERE affiliate_id = ? ORDER BY requested_at DESC`,
+            [affiliateId]
+        );
+
+        if (result.length === 0 || result[0].values.length === 0) {
+            return [];
+        }
+
+        // 使用相同的映射逻辑
+        const columns = result[0].columns;
+        return result[0].values.map((row: any) => {
+            const withdrawal: any = {};
+            columns.forEach((col: string, index: number) => {
+                withdrawal[col] = row[index];
+            });
+
+            // 字段名映射（与 getAllWithdrawalRequests 相同）
+            if (withdrawal.affiliate_id !== undefined) {
+                withdrawal.affiliateId = withdrawal.affiliate_id;
+                delete withdrawal.affiliate_id;
+            }
+            if (withdrawal.affiliate_name !== undefined) {
+                withdrawal.affiliateName = withdrawal.affiliate_name;
+                delete withdrawal.affiliate_name;
+            }
+            if (withdrawal.affiliate_task_id !== undefined) {
+                withdrawal.affiliateTaskId = withdrawal.affiliate_task_id;
+                delete withdrawal.affiliate_task_id;
+            }
+            if (withdrawal.task_title !== undefined) {
+                withdrawal.taskTitle = withdrawal.task_title;
+                delete withdrawal.task_title;
+            }
+            if (withdrawal.payment_method !== undefined) {
+                withdrawal.paymentMethod = withdrawal.payment_method;
+                delete withdrawal.payment_method;
+            }
+            if (withdrawal.payment_details !== undefined) {
+                withdrawal.paymentDetails = withdrawal.payment_details;
+                delete withdrawal.payment_details;
+            }
+            if (withdrawal.requested_at !== undefined) {
+                withdrawal.requestedAt = withdrawal.requested_at;
+                delete withdrawal.requested_at;
+            }
+            if (withdrawal.processed_at !== undefined) {
+                withdrawal.processedAt = withdrawal.processed_at;
+                delete withdrawal.processed_at;
+            }
+            if (withdrawal.completed_at !== undefined) {
+                withdrawal.completedAt = withdrawal.completed_at;
+                delete withdrawal.completed_at;
+            }
+            if (withdrawal.payment_proof !== undefined) {
+                withdrawal.paymentProof = withdrawal.payment_proof;
+                delete withdrawal.payment_proof;
+            }
+            if (withdrawal.admin_notes !== undefined) {
+                withdrawal.adminNotes = withdrawal.admin_notes;
+                delete withdrawal.admin_notes;
+            }
+
+            return withdrawal;
+        });
+    } catch (error) {
+        console.error('[DB] 获取达人提现请求失败:', error);
+        return [];
+    }
+}
+
+// 更新提现请求状态
+export async function updateWithdrawalStatus(
+    withdrawalId: string,
+    status: string,
+    paymentProof?: string,
+    adminNotes?: string
+) {
+    const database = await initDB();
+    try {
+        const updates: string[] = [];
+        const values: any[] = [];
+
+        updates.push('status = ?');
+        values.push(status);
+
+        if (status === 'PROCESSING') {
+            updates.push('processed_at = CURRENT_TIMESTAMP');
+        }
+
+        if (status === 'COMPLETED') {
+            updates.push('completed_at = CURRENT_TIMESTAMP');
+        }
+
+        if (paymentProof) {
+            updates.push('payment_proof = ?');
+            values.push(paymentProof);
+        }
+
+        if (adminNotes) {
+            updates.push('admin_notes = ?');
+            values.push(adminNotes);
+        }
+
+        values.push(withdrawalId);
+
+        database.run(
+            `UPDATE withdrawal_requests SET ${updates.join(', ')} WHERE id = ?`,
+            values
+        );
+        saveDB();
+        console.log(`[DB] 提现请求状态更新成功: ${withdrawalId} -> ${status}`);
+        return { success: true, id: withdrawalId };
+    } catch (error) {
+        console.error('[DB] 更新提现请求状态失败:', error);
+        throw error;
     }
 }

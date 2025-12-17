@@ -5,9 +5,9 @@ export enum UserRole {
 }
 
 export enum Tier {
-  BRONZE = 'BRONZE',
-  SILVER = 'SILVER',
-  GOLD = 'GOLD'
+  CORE_PARTNER = 'CORE_PARTNER',           // 基础合作伙伴
+  PREMIUM_INFLUENCER = 'PREMIUM_INFLUENCER', // 高级影响者
+  OFFICIAL_COLLABORATOR = 'OFFICIAL_COLLABORATOR' // 官方合作者
 }
 
 export enum TaskStatus {
@@ -19,6 +19,13 @@ export enum TaskStatus {
 export enum SettlementStatus {
   PENDING = 'PENDING',
   PAID = 'PAID'
+}
+
+export enum WithdrawalStatus {
+  PENDING = 'PENDING',       // 待处理
+  PROCESSING = 'PROCESSING', // 处理中
+  COMPLETED = 'COMPLETED',   // 已完成
+  REJECTED = 'REJECTED'      // 已拒绝
 }
 
 export interface User {
@@ -93,14 +100,34 @@ export interface Settlement {
   date: string;
 }
 
+// 提现记录
+export interface WithdrawalRequest {
+  id: string;
+  affiliateId: string;
+  affiliateName: string;
+  affiliateTaskId: string;        // 关联的任务ID
+  taskTitle: string;              // 任务标题
+  amount: number;                 // 提现金额
+  paymentMethod: string;          // 收款方式 (PayPal, Bank Transfer, Crypto, etc.)
+  paymentDetails: string;         // 收款详情 (账号、地址等)
+  status: WithdrawalStatus;       // 提现状态
+  requestedAt: string;            // 提交时间
+  processedAt?: string;           // 处理时间
+  completedAt?: string;           // 完成时间
+  paymentProof?: string;          // 付款截图URL
+  adminNotes?: string;            // 运营备注
+}
+
+// 达人等级对应的奖励金额（美元/千次点击）
 export const TIER_RATES = {
-  [Tier.BRONZE]: 50,
-  [Tier.SILVER]: 80,
-  [Tier.GOLD]: 100
+  [Tier.CORE_PARTNER]: 50,           // 基础合作伙伴: $50/1000次点击
+  [Tier.PREMIUM_INFLUENCER]: 80,     // 高级影响者: $80/1000次点击
+  [Tier.OFFICIAL_COLLABORATOR]: 100  // 官方合作者: $100/1000次点击
 };
 
-export const TIER_THRESHOLDS = {
-  [Tier.BRONZE]: 0,
-  [Tier.SILVER]: 10000, // clicks
-  [Tier.GOLD]: 50000  // clicks
+// 达人等级的中英文显示名称
+export const TIER_LABELS = {
+  [Tier.CORE_PARTNER]: { zh: '基础合作伙伴', en: 'Core Partner' },
+  [Tier.PREMIUM_INFLUENCER]: { zh: '高级影响者', en: 'Premium Influencer' },
+  [Tier.OFFICIAL_COLLABORATOR]: { zh: '官方合作者', en: 'Official Collaborator' }
 };
