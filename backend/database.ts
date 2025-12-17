@@ -625,6 +625,24 @@ export async function getAllTasks() {
                 task[col] = row[index];
             });
 
+            // 字段名映射：数据库下划线命名 -> TypeScript 驼峰命名
+            if (task.product_link !== undefined) {
+                task.productLink = task.product_link;
+                delete task.product_link;
+            }
+            if (task.reward_per_click !== undefined) {
+                task.rewardRate = task.reward_per_click;
+                delete task.reward_per_click;
+            }
+            if (task.created_at !== undefined) {
+                task.createdAt = task.created_at;
+                delete task.created_at;
+            }
+            if (task.updated_at !== undefined) {
+                task.updatedAt = task.updated_at;
+                delete task.updated_at;
+            }
+
             // 将 requirements JSON 字符串解析为数组
             if (task.requirements) {
                 try {
@@ -726,6 +744,24 @@ export async function getTaskById(taskId: string) {
         columns.forEach((col: string, index: number) => {
             task[col] = row[index];
         });
+
+        // 字段名映射：数据库下划线命名 -> TypeScript 驼峰命名
+        if (task.product_link !== undefined) {
+            task.productLink = task.product_link;
+            delete task.product_link;
+        }
+        if (task.reward_per_click !== undefined) {
+            task.rewardRate = task.reward_per_click;
+            delete task.reward_per_click;
+        }
+        if (task.created_at !== undefined) {
+            task.createdAt = task.created_at;
+            delete task.created_at;
+        }
+        if (task.updated_at !== undefined) {
+            task.updatedAt = task.updated_at;
+            delete task.updated_at;
+        }
 
         // 将 requirements JSON 字符串解析为数组
         if (task.requirements) {
