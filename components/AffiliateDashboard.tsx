@@ -68,7 +68,9 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
 
       // 2. Fetch Tasks and Stats
       const t = await MockStore.getTasks(initialUser.role);
+      console.log('[达人端] 获取到的所有任务:', t.length, t);
       const mt = await MockStore.getMyTasks(initialUser.id);
+      console.log('[达人端] 我的任务:', mt.length, mt);
       const s = await MockStore.getStats(initialUser.id, initialUser.role);
 
     // 3. 从后端 API 获取每个任务的真实点击统计
@@ -108,6 +110,8 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     // Filter out tasks already claimed
     const claimedIds = new Set(mt.map(i => i.taskId));
     const available = t.filter(task => !claimedIds.has(task.id) && task.status === 'ACTIVE');
+    console.log('[达人端] 已领取的任务ID:', Array.from(claimedIds));
+    console.log('[达人端] 可用任务:', available.length, available);
 
     setAllTasks(t);
     setAvailableTasks(available);
