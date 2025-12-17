@@ -624,6 +624,19 @@ export async function getAllTasks() {
             columns.forEach((col: string, index: number) => {
                 task[col] = row[index];
             });
+
+            // 将 requirements JSON 字符串解析为数组
+            if (task.requirements) {
+                try {
+                    task.requirements = JSON.parse(task.requirements);
+                } catch (e) {
+                    console.error('[DB] 解析 requirements 失败:', e);
+                    task.requirements = [];
+                }
+            } else {
+                task.requirements = [];
+            }
+
             return task;
         });
     } catch (error) {
@@ -636,6 +649,11 @@ export async function getAllTasks() {
 export async function createTask(taskData: any) {
     const database = await initDB();
     try {
+        // 将 requirements 数组转为 JSON 字符串
+        const requirementsJson = Array.isArray(taskData.requirements)
+            ? JSON.stringify(taskData.requirements)
+            : (taskData.requirements || '[]');
+
         database.run(
             `INSERT INTO tasks (id, title, description, product_link, reward_per_click, status, deadline, requirements, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
@@ -647,7 +665,7 @@ export async function createTask(taskData: any) {
                 taskData.rewardPerClick || 0,
                 taskData.status || 'ACTIVE',
                 taskData.deadline || null,
-                taskData.requirements || ''
+                requirementsJson
             ]
         );
         saveDB();
@@ -663,6 +681,11 @@ export async function createTask(taskData: any) {
 export async function updateTask(taskId: string, taskData: any) {
     const database = await initDB();
     try {
+        // 将 requirements 数组转为 JSON 字符串
+        const requirementsJson = Array.isArray(taskData.requirements)
+            ? JSON.stringify(taskData.requirements)
+            : (taskData.requirements || '[]');
+
         database.run(
             `UPDATE tasks
              SET title = ?, description = ?, product_link = ?, reward_per_click = ?,
@@ -675,7 +698,7 @@ export async function updateTask(taskId: string, taskData: any) {
                 taskData.rewardPerClick || 0,
                 taskData.status || 'ACTIVE',
                 taskData.deadline || null,
-                taskData.requirements || '',
+                requirementsJson,
                 taskId
             ]
         );
@@ -703,6 +726,19 @@ export async function getTaskById(taskId: string) {
         columns.forEach((col: string, index: number) => {
             task[col] = row[index];
         });
+
+        // 将 requirements JSON 字符串解析为数组
+        if (task.requirements) {
+            try {
+                task.requirements = JSON.parse(task.requirements);
+            } catch (e) {
+                console.error('[DB] 解析 requirements 失败:', e);
+                task.requirements = [];
+            }
+        } else {
+            task.requirements = [];
+        }
+
         return task;
     } catch (error) {
         console.error('[DB] 获取任务失败:', error);
