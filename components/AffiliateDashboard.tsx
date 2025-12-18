@@ -155,6 +155,20 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
     setMyTasks(validMyTasks); // 使用过滤后的列表
     setStats(s);
 
+    // 🔧 修复：初始化任务链接状态（避免在渲染时更新状态）
+    const initialLinks: Record<string, string[]> = {};
+    validMyTasks.forEach(task => {
+      if (!taskPostLinks[task.id]) {
+        const existingLinks = task.submittedPostLink
+          ? task.submittedPostLink.split('\n').filter(l => l.trim())
+          : [];
+        initialLinks[task.id] = existingLinks.length > 0 ? existingLinks : [''];
+      }
+    });
+    if (Object.keys(initialLinks).length > 0) {
+      setTaskPostLinks(prev => ({ ...prev, ...initialLinks }));
+    }
+
       // 4. 获取我的提现记录
       const withdrawals = await MockStore.getAffiliateWithdrawals(initialUser.id);
       setMyWithdrawals(withdrawals);
@@ -350,16 +364,6 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
   };
 
   // 🔧 新增：多链接管理函数
-  // 初始化任务的链接列表（从已有数据加载或创建空列表）
-  const initTaskLinks = (taskId: string, existingLinks?: string[]) => {
-    if (!taskPostLinks[taskId]) {
-      setTaskPostLinks(prev => ({
-        ...prev,
-        [taskId]: existingLinks && existingLinks.length > 0 ? existingLinks : [''] // 至少有一个空输入框
-      }));
-    }
-  };
-
   // 添加新的链接输入框
   const addPostLink = (taskId: string) => {
     setTaskPostLinks(prev => ({
@@ -1014,13 +1018,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                             <div className="mb-4">
                                 <label className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-2 block">{t('affiliate.proofOfWork')}</label>
                                 {(() => {
-                                    // 初始化链接列表（兼容旧数据）
-                                    if (!taskPostLinks[at.id]) {
-                                        const existingLinks = at.submittedPostLink
-                                            ? at.submittedPostLink.split('\n').filter(l => l.trim())
-                                            : [];
-                                        initTaskLinks(at.id, existingLinks.length > 0 ? existingLinks : undefined);
-                                    }
+                                    // 🔧 修复：不在渲染时更新状态，直接使用已初始化的状态
                                     const links = taskPostLinks[at.id] || [''];
 
                                     return (
