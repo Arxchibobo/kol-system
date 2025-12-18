@@ -59,18 +59,9 @@ let MOCK_AFFILIATE_TASKS: AffiliateTask[] = [];
 // --- Persistence Logic ---
 const loadData = () => {
     try {
-        const storedTasks = localStorage.getItem(STORAGE_KEY_TASKS);
-        if (storedTasks) {
-            MOCK_TASKS = JSON.parse(storedTasks);
-            // Ensure Zootopia task exists even if local storage is old
-            const zooTask = INITIAL_TASKS[0];
-            if (!MOCK_TASKS.find(t => t.id === zooTask.id)) {
-                MOCK_TASKS.unshift(zooTask);
-            }
-        } else {
-            MOCK_TASKS = [...INITIAL_TASKS];
-            localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(MOCK_TASKS));
-        }
+        // ⚠️ 不再从 localStorage 加载 tasks，改为从后端数据库获取
+        // 这样可以确保每次启动都获取最新的、持久化的数据
+        MOCK_TASKS = []; // 初始化为空数组，由 getTasks() 从后端加载
 
         const storedAffiliates = localStorage.getItem(STORAGE_KEY_AFFILIATES);
         if (storedAffiliates) {
@@ -83,7 +74,7 @@ const loadData = () => {
         }
     } catch (e) {
         console.error("Failed to load mock data from storage", e);
-        MOCK_TASKS = [...INITIAL_TASKS];
+        MOCK_TASKS = []; // 改为空数组
     }
 };
 

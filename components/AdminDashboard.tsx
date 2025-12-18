@@ -32,7 +32,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     title: '',
     description: '',
     productLink: '',
-    isSpecialReward: false,
+    isSpecialReward: true, // 默认开启特殊奖励，让三个等级输入框始终显示
     specialRewards: {
       CORE_PARTNER: TIER_RATES[Tier.CORE_PARTNER],
       PREMIUM_INFLUENCER: TIER_RATES[Tier.PREMIUM_INFLUENCER],

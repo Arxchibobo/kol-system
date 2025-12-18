@@ -30,18 +30,18 @@ function AppContent() {
   // --- Client-Side Redirect Interceptor ---
   useEffect(() => {
     const path = window.location.pathname;
-    
+
     if (path.startsWith('/r/') && !redirectAttempted.current) {
         redirectAttempted.current = true;
         setRedirecting(true);
         console.log("Detecting redirect path:", path);
-        
+
         // Decode and Redirect
         MockStore.handleClientRedirect(path).then(destination => {
             if (destination) {
                 console.log("Destination found:", destination);
                 setRedirectUrl(destination);
-                
+
                 // "Double Jump": Brief pause to let the user see the branding, then go.
                 // Using window.location.replace to avoid back-button loops
                 setTimeout(() => {
@@ -52,7 +52,7 @@ function AppContent() {
                         console.error("Auto-redirect failed:", e);
                         setErrorMsg("Auto-redirect blocked. Please click the button below.");
                     }
-                }, 800); 
+                }, 800);
             } else {
                 setRedirecting(false); // Stop redirect mode if decode fails
                 console.warn("Invalid fallback redirect link, could not decode.");
@@ -70,6 +70,17 @@ function AppContent() {
             setUser(JSON.parse(storedUser));
         }
         setLoading(false);
+
+        // 🔄 启动时自动同步 KOL 数据库内容
+        // 这将从 utils/autoImportKOLs.ts 自动导入所有达人信息
+        console.log('🔄 正在自动同步 KOL 数据库...');
+        MockStore.autoImportAllKOLs()
+            .then((result) => {
+                console.log(`✅ KOL 数据同步完成: 成功 ${result.success}, 跳过 ${result.skipped}`);
+            })
+            .catch((error) => {
+                console.error('❌ KOL 数据同步失败:', error);
+            });
     }
   }, []);
 
