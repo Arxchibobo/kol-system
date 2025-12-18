@@ -77,9 +77,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [taskParticipants, setTaskParticipants] = useState<Record<string, any[]>>({});
 
-  // 标签分类系统
-  const AVAILABLE_TAGS = ['AI博主', '时尚博主', '生活博主', '科技博主', '游戏博主', '美食博主', '旅游博主', '其他'];
-  const [selectedTag, setSelectedTag] = useState<string>('全部');
+  // 标签分类系统 - Tag classification system
+  const AVAILABLE_TAGS = ['AI Creator', 'Fashion', 'Lifestyle', 'Tech', 'Gaming', 'Food', 'Travel', 'Other'];
+  const [selectedTag, setSelectedTag] = useState<string>('All');
 
   // Manual Add KOL State
   const [showAddKolModal, setShowAddKolModal] = useState(false);
@@ -728,7 +728,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                          <button
                              onClick={() => handleDeleteTask(task)}
                              className="p-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
-                             title="删除任务"
+                             title="Delete Task"
                          >
                             <Trash2 size={16} />
                          </button>
@@ -1183,7 +1183,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                    const confirmed = window.confirm(
                      `确定要批量处理 ${pendingWithdrawals.length} 笔提现吗？\n` +
                      `总金额: $${pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}\n\n` +
-                     `所有提现将被标记为"处理中"状态。`
+                     `All withdrawals will be marked as "processing" status.`
                    );
                    if (confirmed) {
                      // 批量更新状态
@@ -1305,7 +1305,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     const filteredAffiliates = affiliates.filter(a => {
         const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                              a.email.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesTag = selectedTag === '全部' || (a.tags && a.tags.includes(selectedTag));
+        const matchesTag = selectedTag === 'All' || (a.tags && a.tags.includes(selectedTag));
         const matchesTier = selectedTier === '全部' || a.tier === selectedTier;
         return matchesSearch && matchesTag && matchesTier;
     });
@@ -1340,7 +1340,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             onClick={handleAutoImportAll}
                             disabled={importing}
                             className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="自动导入所有 CSV 文件中的 KOL"
+                            title="Auto-import all KOLs from CSV files"
                         >
                             {importing ? (
                                 <>
@@ -1402,30 +1402,30 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
             {/* 等级筛选下拉框 */}
             <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">等级筛选:</label>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Filter by Tier:</label>
                 <select
                     value={selectedTier}
                     onChange={(e) => setSelectedTier(e.target.value)}
                     className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                 >
-                    <option value="全部">全部等级</option>
-                    <option value={Tier.CORE_PARTNER}>基础合作伙伴 (CORE_PARTNER)</option>
-                    <option value={Tier.PREMIUM_INFLUENCER}>高级影响者 (PREMIUM_INFLUENCER)</option>
-                    <option value={Tier.OFFICIAL_COLLABORATOR}>官方合作者 (OFFICIAL_COLLABORATOR)</option>
+                    <option value="全部">All Tiers</option>
+                    <option value={Tier.CORE_PARTNER}>Core Partner</option>
+                    <option value={Tier.PREMIUM_INFLUENCER}>Premium Influencer</option>
+                    <option value={Tier.OFFICIAL_COLLABORATOR}>Official Collaborator</option>
                 </select>
             </div>
 
             {/* 标签筛选按钮组 */}
             <div className="flex flex-wrap items-center gap-2">
                 <button
-                    onClick={() => setSelectedTag('全部')}
+                    onClick={() => setSelectedTag('All')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        selectedTag === '全部'
+                        selectedTag === 'All'
                             ? 'bg-indigo-600 text-white'
                             : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:border-indigo-500'
                     }`}
                 >
-                    全部 ({affiliates.length})
+                    All ({affiliates.length})
                 </button>
                 {AVAILABLE_TAGS.map((tag) => (
                     <button
@@ -1546,7 +1546,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                     }
                                                 }}
                                                 className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors"
-                                                title="删除达人"
+                                                title="Delete Affiliate"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
@@ -2089,7 +2089,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
             onClick={handleRefreshAll}
             disabled={refreshing}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            title="手动刷新（系统每 10 秒自动刷新）"
+            title="Manual Refresh (Auto-refresh every 10s)"
           >
             <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
           </button>

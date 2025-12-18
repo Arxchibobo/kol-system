@@ -722,7 +722,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                     onClick={handleRefreshStats}
                     disabled={refreshing}
                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    title="手动刷新（系统每 5 秒自动刷新）"
+                    title="Manual Refresh (Auto-refresh every 5s)"
                 >
                     <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                 </button>
@@ -862,7 +862,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                     onClick={handleRefreshStats}
                     disabled={refreshing}
                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    title="手动刷新（系统每 5 秒自动刷新）"
+                    title="Manual Refresh (Auto-refresh every 5s)"
                 >
                     <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                 </button>
@@ -893,7 +893,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                                 handleGiveUp(at.id);
                             }}
                             className="absolute top-4 right-4 text-slate-400 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-slate-200 dark:border-slate-700 hover:border-red-300 dark:hover:border-red-600"
-                            title="放弃任务 (Release Task)"
+                            title="Release Task"
                         >
                             <Trash2 size={18} />
                         </button>
@@ -1534,7 +1534,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                   value={withdrawalForm.paymentDetails}
                   onChange={(e) => setWithdrawalForm({ ...withdrawalForm, paymentDetails: e.target.value })}
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                  placeholder="请输入收款账号"
+                  placeholder="Enter your wallet address"
                 />
               </div>
 
