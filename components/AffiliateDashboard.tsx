@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, Task, AffiliateTask, Tier, TIER_RATES, WithdrawalStatus, Notification } from '../types';
 import { MockStore } from '../services/mockStore';
 import { LayoutGrid, Target, Award, DollarSign, ExternalLink, Copy, CheckCircle, BarChart3, Settings as SettingsIcon, Play, Loader2, X, ChevronRight, AlertCircle, Trash2, RefreshCw, Wallet, Bell } from 'lucide-react';
@@ -219,9 +219,12 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
     const hasSeenWelcome = localStorage.getItem(`myshell_welcome_seen_${initialUser.id}`);
     if (!hasSeenWelcome) {
       // 延迟500ms显示，让用户先看到界面
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setShowWelcomeModal(true);
       }, 500);
+
+      // 🔧 清理定时器，防止组件卸载后仍然执行
+      return () => clearTimeout(timer);
     }
   }, [initialUser.id]);
 
@@ -241,6 +244,11 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
       clearInterval(intervalId);
     };
   }, [loadData]); // Depend on loadData to ensure we use the latest function
+
+  // 🔧 使用 useMemo 缓存任务 ID 列表，避免每次渲染都创建新字符串
+  const taskIds = useMemo(() => {
+    return myTasks.map(t => t.id).join(',');
+  }, [myTasks]);
 
   // 🔧 修复：使用 useEffect 初始化链接，但避免循环依赖
   useEffect(() => {
@@ -262,7 +270,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
         return hasChanges ? newLinks : prev;
       });
     }
-  }, [myTasks.map(t => t.id).join(',')]); // 仅依赖任务 ID 列表
+  }, [taskIds, myTasks]); // 使用 useMemo 缓存的 taskIds
 
   // 点击 "Confirm & Claim" 按钮 - 先显示任务指引
   const handleConfirmClaim = (task: Task) => {
