@@ -59,6 +59,31 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
   // 🔧 新增：多链接管理状态 - 为每个任务维护链接数组
   const [taskPostLinks, setTaskPostLinks] = useState<Record<string, string[]>>({});
 
+  // 刷新状态
+  const [refreshing, setRefreshing] = useState(false);
+
+  // 个人资料编辑状态
+  const [profileData, setProfileData] = useState({
+    followerCount: 0,
+    walletAddress: '',
+    socialLinks: {
+      twitter: '',
+      instagram: '',
+      youtube: '',
+      tiktok: '',
+      linkedin: '',
+      reddit: '',
+      facebook: '',
+      twitch: '',
+      discord: ''
+    }
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Feedback 状态
+  const [feedbackText, setFeedbackText] = useState('');
+  const [sendingFeedback, setSendingFeedback] = useState(false);
+
   const { t } = useLanguage();
   const { theme } = useTheme();
 
@@ -421,7 +446,6 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
   };
 
   // 刷新统计数据
-  const [refreshing, setRefreshing] = useState(false);
   const handleRefreshStats = async () => {
     setRefreshing(true);
     loadData().catch(err => {
@@ -430,28 +454,6 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
       setTimeout(() => setRefreshing(false), 500);
     });
   };
-
-  // 个人资料编辑状态
-  const [profileData, setProfileData] = useState({
-    followerCount: 0,
-    walletAddress: '',
-    socialLinks: {
-      twitter: '',
-      instagram: '',
-      youtube: '',
-      tiktok: '',
-      linkedin: '',
-      reddit: '',
-      facebook: '',
-      twitch: '',
-      discord: ''
-    }
-  });
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  // Feedback 状态
-  const [feedbackText, setFeedbackText] = useState('');
-  const [sendingFeedback, setSendingFeedback] = useState(false);
 
   // 加载用户资料时初始化
   useEffect(() => {
