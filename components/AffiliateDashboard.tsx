@@ -56,6 +56,9 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
 
+  // 🔧 新增：多链接管理状态 - 为每个任务维护链接数组
+  const [taskPostLinks, setTaskPostLinks] = useState<Record<string, string[]>>({});
+
   const { t } = useLanguage();
   const { theme } = useTheme();
 
@@ -102,11 +105,14 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                     // 计算预估收益 - 根据任务配置和用户等级
                     const userTier = refreshedUser?.tier || Tier.CORE_PARTNER;
                     const taskData = t.find(tsk => tsk.id === task.taskId);
-                    let rate = TIER_RATES[userTier];
+                    let rate = TIER_RATES[userTier] || 50; // 🔧 修复：默认使用 50 防止 undefined
                     if (taskData?.isSpecialReward && taskData?.specialRewards) {
-                        rate = taskData.specialRewards[userTier];
+                        rate = taskData.specialRewards[userTier] || rate; // 🔧 修复：如果特殊奖励未定义，使用默认 rate
                     }
-                    const estimatedEarnings = (stats.totalClicks * rate) / 1000;
+                    // 🔧 修复：防止 NaN，确保数值有效
+                    const validClicks = stats.totalClicks || 0;
+                    const validRate = isNaN(rate) ? 50 : rate;
+                    const estimatedEarnings = (validClicks * validRate) / 1000;
 
                     return {
                         ...task,
@@ -339,6 +345,59 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
 
   const handleSubmitLink = async (affTaskId: string, link: string) => {
     await MockStore.submitPost(affTaskId, link);
+    const updated = await MockStore.getMyTasks(dashboardUser.id);
+    setMyTasks(updated);
+  };
+
+  // 🔧 新增：多链接管理函数
+  // 初始化任务的链接列表（从已有数据加载或创建空列表）
+  const initTaskLinks = (taskId: string, existingLinks?: string[]) => {
+    if (!taskPostLinks[taskId]) {
+      setTaskPostLinks(prev => ({
+        ...prev,
+        [taskId]: existingLinks && existingLinks.length > 0 ? existingLinks : [''] // 至少有一个空输入框
+      }));
+    }
+  };
+
+  // 添加新的链接输入框
+  const addPostLink = (taskId: string) => {
+    setTaskPostLinks(prev => ({
+      ...prev,
+      [taskId]: [...(prev[taskId] || ['']), '']
+    }));
+  };
+
+  // 更新指定位置的链接
+  const updatePostLink = (taskId: string, index: number, value: string) => {
+    setTaskPostLinks(prev => {
+      const links = [...(prev[taskId] || [''])];
+      links[index] = value;
+      return { ...prev, [taskId]: links };
+    });
+  };
+
+  // 删除指定位置的链接
+  const removePostLink = (taskId: string, index: number) => {
+    setTaskPostLinks(prev => {
+      const links = [...(prev[taskId] || [''])];
+      // 至少保留一个输入框
+      if (links.length > 1) {
+        links.splice(index, 1);
+      } else {
+        links[0] = ''; // 清空最后一个
+      }
+      return { ...prev, [taskId]: links };
+    });
+  };
+
+  // 保存所有链接到服务器
+  const savePostLinks = async (affTaskId: string) => {
+    const links = taskPostLinks[affTaskId] || [];
+    // 过滤掉空链接
+    const validLinks = links.filter(link => link.trim() !== '');
+    // 调用 API 保存（需要修改 submitPost 支持多链接）
+    await MockStore.submitPost(affTaskId, validLinks.join('\n')); // 暂时用换行符连接
     const updated = await MockStore.getMyTasks(dashboardUser.id);
     setMyTasks(updated);
   };
@@ -951,20 +1010,63 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                                 </p>
                             </div>
 
-                            {/* Post Submission */}
+                            {/* 🔧 修改：支持多个推文链接 */}
                             <div className="mb-4">
                                 <label className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-2 block">{t('affiliate.proofOfWork')}</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        placeholder={t('affiliate.pasteLink')}
-                                        defaultValue={at.submittedPostLink}
-                                        onBlur={(e) => handleSubmitLink(at.id, e.target.value)}
-                                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 w-full text-sm text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none transition-colors"
-                                        disabled={at.status === 'VERIFIED'}
-                                    />
-                                    {at.status !== 'VERIFIED' && <button className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 whitespace-nowrap px-2">{t('common.save')}</button>}
-                                </div>
+                                {(() => {
+                                    // 初始化链接列表（兼容旧数据）
+                                    if (!taskPostLinks[at.id]) {
+                                        const existingLinks = at.submittedPostLink
+                                            ? at.submittedPostLink.split('\n').filter(l => l.trim())
+                                            : [];
+                                        initTaskLinks(at.id, existingLinks.length > 0 ? existingLinks : undefined);
+                                    }
+                                    const links = taskPostLinks[at.id] || [''];
+
+                                    return (
+                                        <div className="space-y-2">
+                                            {links.map((link, index) => (
+                                                <div key={index} className="flex gap-2">
+                                                    <input
+                                                        type="url"
+                                                        value={link}
+                                                        onChange={(e) => updatePostLink(at.id, index, e.target.value)}
+                                                        placeholder={`${t('affiliate.pasteLink')} (optional)`}
+                                                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 flex-1 text-sm text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none transition-colors"
+                                                        disabled={at.status === 'VERIFIED'}
+                                                    />
+                                                    {at.status !== 'VERIFIED' && links.length > 1 && (
+                                                        <button
+                                                            onClick={() => removePostLink(at.id, index)}
+                                                            className="p-2 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                                            title="Remove link"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            <div className="flex gap-2">
+                                                {at.status !== 'VERIFIED' && (
+                                                    <button
+                                                        onClick={() => addPostLink(at.id)}
+                                                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium"
+                                                    >
+                                                        + Add Another Link
+                                                    </button>
+                                                )}
+                                                {at.status !== 'VERIFIED' && (
+                                                    <button
+                                                        onClick={() => savePostLinks(at.id)}
+                                                        className="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded"
+                                                    >
+                                                        {t('common.save')}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
 
@@ -976,7 +1078,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                              </div>
                              <div>
                                 <p className="text-xs text-slate-500">{t('affiliate.estEarnings')}</p>
-                                <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">${at.stats.estimatedEarnings.toFixed(2)}</p>
+                                <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">${(at.stats.estimatedEarnings || 0).toFixed(2)}</p>
                              </div>
                              <div>
                                 <p className="text-xs text-slate-500">{t('affiliate.conversion')}</p>

@@ -84,7 +84,8 @@ export interface AffiliateTask {
   affiliateId: string;
   taskId: string;
   uniqueTrackingLink: string;
-  submittedPostLink?: string; // The link the affiliate posts (tweet, video)
+  submittedPostLink?: string; // 🔧 保留旧字段以保持兼容性 - The link the affiliate posts (tweet, video)
+  submittedPostLinks?: string[]; // 🔧 新增：支持多个推文链接 - Multiple links (tweets, videos, etc.)
   status: 'CLAIMED' | 'SUBMITTED' | 'VERIFIED' | 'REJECTED';
   stats: {
     totalClicks: number;

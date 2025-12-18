@@ -711,7 +711,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                     className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
                                 >
                                     <Users size={14} />
-                                    <span>{participants.length || '?'} 位达人参与</span>
+                                    <span>{participants.length} Participants</span>
                                     <ChevronRight size={14} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                 </button>
                             </div>
@@ -767,38 +767,75 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                     {/* 参与者列表（展开时显示） */}
                     {isExpanded && (
                         <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4">
-                            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">参与的达人</h4>
+                            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Participants</h4>
                             {participants.length === 0 ? (
-                                <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">暂无达人参与此任务</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">No participants yet</p>
                             ) : (
                                 <div className="space-y-2">
                                     {participants.map((p: any) => (
-                                        <div key={p.affiliateTaskId} className="flex items-center justify-between bg-white dark:bg-slate-900 p-3 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                                                    {p.affiliateName?.charAt(0) || '?'}
+                                        <div key={p.affiliateTaskId} className="bg-white dark:bg-slate-900 p-3 rounded-lg">
+                                            {/* 🔧 修复：达人基本信息行 */}
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                                        {p.affiliateName?.charAt(0) || '?'}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-slate-900 dark:text-white">{p.affiliateName}</p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{p.affiliateEmail}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm font-medium text-slate-900 dark:text-white">{p.affiliateName}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{p.affiliateEmail}</p>
+                                                <div className="flex items-center gap-4 text-xs">
+                                                    <span className={`px-2 py-1 rounded-full font-medium ${
+                                                        p.affiliateTier === 'OFFICIAL_COLLABORATOR' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
+                                                        p.affiliateTier === 'PREMIUM_INFLUENCER' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                                                        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                                    }`}>
+                                                        {p.affiliateTier}
+                                                    </span>
+                                                    <span className="text-slate-500 dark:text-slate-400">{p.totalClicks || 0} clicks</span>
+                                                    <span className={`px-2 py-1 rounded-full font-medium ${
+                                                        p.status === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                                        'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                                    }`}>
+                                                        {p.status}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-4 text-xs">
-                                                <span className={`px-2 py-1 rounded-full font-medium ${
-                                                    p.affiliateTier === 'OFFICIAL_COLLABORATOR' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
-                                                    p.affiliateTier === 'PREMIUM_INFLUENCER' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
-                                                    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                                }`}>
-                                                    {p.affiliateTier}
-                                                </span>
-                                                <span className="text-slate-500 dark:text-slate-400">{p.totalClicks || 0} clicks</span>
-                                                <span className={`px-2 py-1 rounded-full font-medium ${
-                                                    p.status === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-                                                    'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                                                }`}>
-                                                    {p.status}
-                                                </span>
-                                            </div>
+                                            {/* 🔧 新增：推文链接显示（支持多个链接） */}
+                                            {(() => {
+                                                // 🔧 兼容旧数据：支持单个字符串或多行字符串
+                                                const linkText = p.submittedPostLink || '';
+                                                const links = linkText.trim() ? linkText.split('\n').filter(l => l.trim()) : [];
+
+                                                if (links.length === 0) {
+                                                    return (
+                                                        <div className="pl-11 text-xs text-slate-400 dark:text-slate-500 italic">
+                                                            No post link submitted yet
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div className="pl-11 text-xs space-y-1">
+                                                        <span className="text-slate-500 dark:text-slate-400 font-medium">
+                                                            Post{links.length > 1 ? 's' : ''}:
+                                                        </span>
+                                                        {links.map((link, idx) => (
+                                                            <div key={idx}>
+                                                                <a
+                                                                    href={link}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                                                                >
+                                                                    {links.length > 1 ? `${idx + 1}. ` : ''}{link}
+                                                                </a>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     ))}
                                 </div>
