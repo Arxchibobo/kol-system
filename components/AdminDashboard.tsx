@@ -946,26 +946,26 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                     className="w-4 h-4 text-indigo-600 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 rounded focus:ring-indigo-500"
                                 />
                                 <label htmlFor="specialReward" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                                    使用特殊奖励金额
+                                    Use Special Reward Amounts
                                 </label>
                             </div>
 
                             {!newTask.isSpecialReward && (
                                 <div className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
-                                    <p className="font-medium">默认奖励标准:</p>
+                                    <p className="font-medium">Default Reward Standards:</p>
                                     <ul className="list-disc list-inside space-y-1 ml-2">
-                                        <li>基础合作伙伴: ${TIER_RATES[Tier.CORE_PARTNER]}/1000点击</li>
-                                        <li>高级影响者: ${TIER_RATES[Tier.PREMIUM_INFLUENCER]}/1000点击</li>
-                                        <li>官方合作者: ${TIER_RATES[Tier.OFFICIAL_COLLABORATOR]}/1000点击</li>
+                                        <li>Core Partner: ${TIER_RATES[Tier.CORE_PARTNER]}/1000 clicks</li>
+                                        <li>Premium Influencer: ${TIER_RATES[Tier.PREMIUM_INFLUENCER]}/1000 clicks</li>
+                                        <li>Official Collaborator: ${TIER_RATES[Tier.OFFICIAL_COLLABORATOR]}/1000 clicks</li>
                                     </ul>
                                 </div>
                             )}
 
                             {newTask.isSpecialReward && (
                                 <div className="space-y-3 mt-2">
-                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">自定义奖励金额 ($/1000次点击):</p>
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Custom Reward Amounts ($/1000 clicks):</p>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">基础合作伙伴</label>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Core Partner</label>
                                         <input
                                             type="number"
                                             min="0"
@@ -983,7 +983,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">高级影响者</label>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Premium Influencer</label>
                                         <input
                                             type="number"
                                             min="0"
@@ -1001,7 +1001,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">官方合作者</label>
+                                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Official Collaborator</label>
                                         <input
                                             type="number"
                                             min="0"
@@ -1158,44 +1158,44 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-500 dark:text-slate-400">总提现金额</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">Total Withdrawals</span>
               <DollarSign size={20} className="text-blue-600 dark:text-blue-400" />
             </div>
             <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.totalAmount.toFixed(2)}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.totalCount} 笔</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{stats.totalCount} transactions</p>
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-500 dark:text-slate-400">已完成金额</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">Completed</span>
               <CheckCircle size={20} className="text-emerald-600 dark:text-emerald-400" />
             </div>
             <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${stats.completedAmount.toFixed(2)}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.completedCount} 笔</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{stats.completedCount} transactions</p>
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-500 dark:text-slate-400">待处理金额</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">Pending</span>
               <Activity size={20} className="text-amber-600 dark:text-amber-400" />
             </div>
             <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">${stats.pendingAmount.toFixed(2)}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">共 {stats.pendingCount} 笔</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{stats.pendingCount} transactions</p>
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-500 dark:text-slate-400">本月提现</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">This Month</span>
               <BarChart3 size={20} className="text-purple-600 dark:text-purple-400" />
             </div>
             <p className="text-2xl font-bold text-slate-900 dark:text-white">${stats.monthlyAmount.toFixed(2)}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">本年: ${stats.yearlyAmount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">This year: ${stats.yearlyAmount.toFixed(2)}</p>
           </div>
         </div>
 
         {/* 月度趋势图 */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">提现趋势（最近12个月）</h3>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Withdrawal Trend (Last 12 Months)</h3>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={stats.monthlyStats}>
               <defs>
@@ -1252,7 +1252,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
                    const link = document.createElement('a');
                    link.href = URL.createObjectURL(blob);
-                   link.download = `提现清单_${new Date().toISOString().split('T')[0]}.csv`;
+                   link.download = `withdrawals_${new Date().toISOString().split('T')[0]}.csv`;
                    link.click();
                  }}
                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -1299,7 +1299,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                  onClick={() => setShowAutoReviewModal(true)}
                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                >
-                 <SettingsIcon size={16} /> 审核规则
+                 <SettingsIcon size={16} /> Review Rules
                </button>
              </div>
         </div>
@@ -1351,23 +1351,23 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                     onClick={() => handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.PROCESSING)}
                                                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium"
                                                 >
-                                                    处理中
+                                                    Processing
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        const notes = prompt('拒绝原因:');
+                                                        const notes = prompt('Rejection reason:');
                                                         if (notes) handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.REJECTED, undefined, notes);
                                                     }}
                                                     className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium"
                                                 >
-                                                    拒绝
+                                                    Reject
                                                 </button>
                                             </>
                                         )}
                                         {w.status === WithdrawalStatus.PROCESSING && (
                                             <button
                                                 onClick={() => {
-                                                    const proof = prompt('付款截图URL:');
+                                                    const proof = prompt('Payment proof URL:');
                                                     if (proof) handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.COMPLETED, proof);
                                                 }}
                                                 className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-medium"
@@ -1606,7 +1606,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             ) : (
                                 <>
                                     <CheckCircle size={16} />
-                                    自动导入全部
+                                    Import All
                                 </>
                             )}
                         </button>
@@ -1664,7 +1664,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                     onChange={(e) => setSelectedTier(e.target.value)}
                     className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                 >
-                    <option value="全部">All Tiers</option>
+                    <option value="All">All Tiers</option>
                     <option value={Tier.CORE_PARTNER}>Core Partner</option>
                     <option value={Tier.PREMIUM_INFLUENCER}>Premium Influencer</option>
                     <option value={Tier.OFFICIAL_COLLABORATOR}>Official Collaborator</option>
@@ -1867,19 +1867,19 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                                     onChange={(e) => handleUpdateTier(aff, e.target.value as Tier)}
                                                                     className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                                                                 >
-                                                                    <option value={Tier.CORE_PARTNER}>基础合作伙伴 ($50/1000)</option>
-                                                                    <option value={Tier.PREMIUM_INFLUENCER}>高级影响者 ($80/1000)</option>
-                                                                    <option value={Tier.OFFICIAL_COLLABORATOR}>官方合作者 ($100/1000)</option>
+                                                                    <option value={Tier.CORE_PARTNER}>Core Partner ($50/1000)</option>
+                                                                    <option value={Tier.PREMIUM_INFLUENCER}>Premium Influencer ($80/1000)</option>
+                                                                    <option value={Tier.OFFICIAL_COLLABORATOR}>Official Collaborator ($100/1000)</option>
                                                                 </select>
                                                             </div>
                                                         </div>
 
                                                         {/* 标签编辑区域 */}
                                                         <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                                            <h5 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">编辑标签</h5>
+                                                            <h5 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Edit Tags</h5>
                                                             {/* 当前标签 */}
                                                             <div className="mb-3">
-                                                                <p className="text-xs text-slate-500 mb-2">当前标签:</p>
+                                                                <p className="text-xs text-slate-500 mb-2">Current Tags:</p>
                                                                 <div className="flex flex-wrap gap-2">
                                                                     {aff.tags && aff.tags.length > 0 ? (
                                                                         aff.tags.map((tag, idx) => (
@@ -1912,7 +1912,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                             </div>
                                                             {/* 添加标签 */}
                                                             <div>
-                                                                <p className="text-xs text-slate-500 mb-2">添加标签:</p>
+                                                                <p className="text-xs text-slate-500 mb-2">Add Tags:</p>
                                                                 <div className="flex flex-wrap gap-2">
                                                                     {AVAILABLE_TAGS.map((tag) => {
                                                                         const hasTag = aff.tags && aff.tags.includes(tag);
@@ -2030,9 +2030,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                         value={newKol.tier}
                                         onChange={e => setNewKol({...newKol, tier: e.target.value as Tier})}
                                     >
-                                        <option value={Tier.CORE_PARTNER}>基础合作伙伴 ($50/1000)</option>
-                                        <option value={Tier.PREMIUM_INFLUENCER}>高级影响者 ($80/1000)</option>
-                                        <option value={Tier.OFFICIAL_COLLABORATOR}>官方合作者 ($100/1000)</option>
+                                        <option value={Tier.CORE_PARTNER}>Core Partner ($50/1000)</option>
+                                        <option value={Tier.PREMIUM_INFLUENCER}>Premium Influencer ($80/1000)</option>
+                                        <option value={Tier.OFFICIAL_COLLABORATOR}>Official Collaborator ($100/1000)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -2088,7 +2088,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
                             {/* 标签选择 */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">标签分类</label>
+                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Tag Category</label>
                                 <div className="flex flex-wrap gap-2">
                                     {AVAILABLE_TAGS.map((tag) => {
                                         const isSelected = newKol.tags?.includes(tag);
@@ -2139,9 +2139,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             <X size={20}/>
                         </button>
 
-                        <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">导入 KOL 数据</h3>
+                        <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">Import KOL Data</h3>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                            上传 CSV 文件批量导入 KOL 信息。文件应包含以下列：Name, Handle, Platform, Tier, Followers, Category, Email 等。
+                            Upload a CSV file to batch import KOL information. The file should include columns: Name, Handle, Platform, Tier, Followers, Category, Email, etc.
                         </p>
 
                         <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center hover:border-indigo-500 transition-colors">
@@ -2172,7 +2172,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                         {importing && (
                             <div className="mt-4 flex items-center justify-center gap-2 text-indigo-600 dark:text-indigo-400">
                                 <RefreshCw size={16} className="animate-spin" />
-                                <span className="text-sm">正在解析文件...</span>
+                                <span className="text-sm">Parsing file...</span>
                             </div>
                         )}
 
@@ -2196,16 +2196,16 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             <X size={20}/>
                         </button>
 
-                        <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">导入预览</h3>
+                        <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">Import Preview</h3>
 
                         {/* 统计信息 */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                             <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-lg">
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">总数</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">{importResult.total}</p>
                             </div>
                             <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4 rounded-lg">
-                                <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">将导入</p>
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">To Import</p>
                                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{importResult.success}</p>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-lg">
@@ -2220,7 +2220,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
                         {/* 标签统计 */}
                         <div className="mb-4">
-                            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">标签分布:</p>
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tag Distribution:</p>
                             <div className="flex flex-wrap gap-2">
                                 {Object.entries(getTagStats(importResult.users)).map(([tag, count]) => (
                                     <span
@@ -2235,15 +2235,15 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
                         {/* 预览表格 */}
                         <div className="flex-1 overflow-auto custom-scrollbar mb-6">
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">前 10 条预览:</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">First 10 entries preview:</p>
                             <table className="w-full text-sm">
                                 <thead className="bg-slate-50 dark:bg-slate-950 sticky top-0">
                                     <tr>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">名称</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">邮箱</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">等级</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">粉丝数</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">标签</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Name</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Email</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Tier</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Followers</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Tags</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2251,7 +2251,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                         <tr key={idx} className="border-b border-slate-200 dark:border-slate-800">
                                             <td className="px-4 py-2 text-slate-900 dark:text-white">{user.name}</td>
                                             <td className="px-4 py-2 text-slate-600 dark:text-slate-400 font-mono text-xs">
-                                                {user.email || <span className="text-slate-400">（无）</span>}
+                                                {user.email || <span className="text-slate-400">(None)</span>}
                                             </td>
                                             <td className="px-4 py-2">
                                                 <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
@@ -2377,7 +2377,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAutoReviewModal(false)}>
           <div className="bg-white dark:bg-slate-900 rounded-xl max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">自动审核规则配置</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Auto Review Rules Configuration</h2>
               <button onClick={() => setShowAutoReviewModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
                 <X size={20} className="text-slate-500" />
               </button>
@@ -2386,8 +2386,8 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
               {/* 启用开关 */}
               <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                 <div>
-                  <h3 className="font-medium text-slate-900 dark:text-white">启用自动审核</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">符合条件的提现将自动通过审核</p>
+                  <h3 className="font-medium text-slate-900 dark:text-white">Enable Auto Review</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Withdrawals meeting the criteria will be automatically approved</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -2402,10 +2402,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
               {/* 金额范围 */}
               <div className="space-y-4">
-                <h3 className="font-medium text-slate-900 dark:text-white">金额范围</h3>
+                <h3 className="font-medium text-slate-900 dark:text-white">Amount Range</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">最低金额 ($)</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Minimum Amount ($)</label>
                     <input
                       type="number"
                       value={autoReviewRules.minAmount}
@@ -2414,7 +2414,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">最高金额 ($)</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Maximum Amount ($)</label>
                     <input
                       type="number"
                       value={autoReviewRules.maxAmount}
@@ -2431,7 +2431,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                     onChange={(e) => setAutoReviewRules({...autoReviewRules, autoApproveUnder: Number(e.target.value)})}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
-                  <p className="text-xs text-slate-500 mt-1">低于此金额且满足其他条件的提现将自动通过</p>
+                  <p className="text-xs text-slate-500 mt-1">Withdrawals below this amount that meet other criteria will be auto-approved</p>
                 </div>
               </div>
 
@@ -2454,7 +2454,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                     onChange={(e) => setAutoReviewRules({...autoReviewRules, requireVerifiedAccount: e.target.checked})}
                     className="w-4 h-4 text-blue-600 rounded"
                   />
-                  <span className="text-sm text-slate-600 dark:text-slate-400">要求账号已验证</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Require verified account</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -2473,7 +2473,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                   onClick={() => setShowAutoReviewModal(false)}
                   className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                 >
-                  取消
+                  Cancel
                 </button>
                 <button
                   onClick={() => {
@@ -2484,7 +2484,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                   }}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
-                  保存规则
+                  Save Rules
                 </button>
               </div>
             </div>

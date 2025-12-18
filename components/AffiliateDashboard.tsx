@@ -635,7 +635,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <Bell size={18} className="text-slate-600 dark:text-slate-400" />
-            <h3 className="font-bold text-slate-900 dark:text-white">通知中心</h3>
+            <h3 className="font-bold text-slate-900 dark:text-white">Notification Center</h3>
             {unreadCount > 0 && (
               <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
                 {unreadCount}
@@ -767,7 +767,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                     {(dashboardUser.pendingEarnings || 0) < 50 && (
                         <div className="mb-2 text-xs text-amber-400 flex items-center gap-1">
                             <AlertCircle size={12} />
-                            <span>还需 ${(50 - (dashboardUser.pendingEarnings || 0)).toFixed(2)} 达到提现门槛</span>
+                            <span>Need ${(50 - (dashboardUser.pendingEarnings || 0)).toFixed(2)} more to reach withdrawal threshold</span>
                         </div>
                     )}
                     <button
@@ -777,7 +777,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                                 ? 'bg-white text-slate-900 hover:bg-slate-200'
                                 : 'bg-slate-600 text-slate-400 cursor-not-allowed'
                         }`}
-                        title={(dashboardUser.pendingEarnings || 0) < 50 ? '最低提现金额为 $50' : ''}
+                        title={(dashboardUser.pendingEarnings || 0) < 50 ? 'Minimum withdrawal amount is $50' : ''}
                     >
                         {t('affiliate.requestWithdrawal')}
                     </button>
@@ -800,7 +800,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
                     <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`}></div>
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                        {refreshing ? '同步中...' : '实时同步'}
+                        {refreshing ? 'Syncing...' : 'Live Sync'}
                     </span>
                 </div>
             </div>
@@ -940,7 +940,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
                     <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`}></div>
                     <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                        {refreshing ? '同步中...' : '实时同步'}
+                        {refreshing ? 'Syncing...' : 'Live Sync'}
                     </span>
                 </div>
             </div>
@@ -1098,12 +1098,12 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                                      className="w-full mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
                                  >
                                      <DollarSign size={16} />
-                                     申请提现
+                                     Request Withdrawal
                                  </button>
                              )}
                              {at.submittedPostLink && at.stats.estimatedEarnings < 50 && (
                                  <p className="text-xs text-slate-500 text-center mt-2">
-                                     最低提现金额: $50
+                                     Minimum withdrawal: $50
                                  </p>
                              )}
                         </div>
@@ -1176,28 +1176,28 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                           withdrawal.status === WithdrawalStatus.REJECTED ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
                           'bg-amber-500/10 text-amber-600 dark:text-amber-400'
                         }`}>
-                          {withdrawal.status === WithdrawalStatus.COMPLETED ? '已完成' :
-                           withdrawal.status === WithdrawalStatus.PROCESSING ? '处理中' :
-                           withdrawal.status === WithdrawalStatus.REJECTED ? '已拒绝' : '待审核'}
+                          {withdrawal.status === WithdrawalStatus.COMPLETED ? 'Completed' :
+                           withdrawal.status === WithdrawalStatus.PROCESSING ? 'Processing' :
+                           withdrawal.status === WithdrawalStatus.REJECTED ? 'Rejected' : 'Pending'}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
-                          <p className="text-slate-500 dark:text-slate-400">提现金额</p>
+                          <p className="text-slate-500 dark:text-slate-400">Withdrawal Amount</p>
                           <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">${withdrawal.amount.toFixed(2)}</p>
                         </div>
                         <div>
-                          <p className="text-slate-500 dark:text-slate-400">收款方式</p>
+                          <p className="text-slate-500 dark:text-slate-400">Payment Method</p>
                           <p className="text-slate-900 dark:text-white">{withdrawal.paymentMethod}</p>
                         </div>
                         <div>
-                          <p className="text-slate-500 dark:text-slate-400">申请时间</p>
+                          <p className="text-slate-500 dark:text-slate-400">Request Time</p>
                           <p className="text-slate-900 dark:text-white">{new Date(withdrawal.requestedAt).toLocaleString('zh-CN')}</p>
                         </div>
                         {withdrawal.completedAt && (
                           <div>
-                            <p className="text-slate-500 dark:text-slate-400">完成时间</p>
+                            <p className="text-slate-500 dark:text-slate-400">Completed Time</p>
                             <p className="text-slate-900 dark:text-white">{new Date(withdrawal.completedAt).toLocaleString('zh-CN')}</p>
                           </div>
                         )}
@@ -1205,14 +1205,14 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
 
                       {withdrawal.status === WithdrawalStatus.REJECTED && withdrawal.adminNotes && (
                         <div className="mt-4 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
-                          <p className="text-xs text-red-700 dark:text-red-400 font-medium mb-1">拒绝原因：</p>
+                          <p className="text-xs text-red-700 dark:text-red-400 font-medium mb-1">Rejection Reason:</p>
                           <p className="text-sm text-red-800 dark:text-red-300">{withdrawal.adminNotes}</p>
                         </div>
                       )}
 
                       {withdrawal.status === WithdrawalStatus.COMPLETED && withdrawal.paymentProof && (
                         <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                          <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mb-2">✓ 已打款</p>
+                          <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mb-2">✓ Payment Sent</p>
                           <a
                             href={withdrawal.paymentProof}
                             target="_blank"
@@ -1601,7 +1601,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowWithdrawalModal(false)}>
           <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">申请提现</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Request Withdrawal</h2>
               <button onClick={() => setShowWithdrawalModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
                 <X size={20} className="text-slate-500" />
               </button>
@@ -1609,17 +1609,17 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
 
             <div className="space-y-4 mb-6">
               <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">任务</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Task</p>
                 <p className="font-medium text-slate-900 dark:text-white">{allTasks.find(t => t.id === withdrawalTask.taskId)?.title}</p>
               </div>
 
               <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                <p className="text-sm text-emerald-700 dark:text-emerald-400 mb-1">提现金额</p>
+                <p className="text-sm text-emerald-700 dark:text-emerald-400 mb-1">Withdrawal Amount</p>
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${withdrawalTask.stats.estimatedEarnings.toFixed(2)}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">收款方式</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Payment Method</label>
                 <select
                   value={withdrawalForm.paymentMethod}
                   onChange={(e) => setWithdrawalForm({ ...withdrawalForm, paymentMethod: e.target.value })}
@@ -1634,8 +1634,8 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  收款账号
-                  <span className="text-xs text-slate-500 ml-2">(邮箱/账号/地址)</span>
+                  Payment Account
+                  <span className="text-xs text-slate-500 ml-2">(Email/Account/Address)</span>
                 </label>
                 <input
                   type="text"
@@ -1665,7 +1665,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                 disabled={!withdrawalForm.paymentDetails}
                 className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg font-medium"
               >
-                确认提现
+                Confirm Withdrawal
               </button>
             </div>
           </div>
