@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Task, TaskStatus, Tier, UserRole, TIER_RATES, WithdrawalRequest, WithdrawalStatus } from '../types';
+import { User, Task, TaskStatus, Tier, UserRole, TIER_RATES, WithdrawalRequest, WithdrawalStatus, ApprovalStatus } from '../types';
 import { MockStore } from '../services/mockStore';
-import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload, Settings as SettingsIcon, UserCheck, UserX } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -12,7 +12,7 @@ interface Props {
   user: User;
 }
 
-type Tab = 'OVERVIEW' | 'TASKS' | 'AFFILIATES' | 'WITHDRAWALS';
+type Tab = 'OVERVIEW' | 'TASKS' | 'AFFILIATES' | 'WITHDRAWALS' | 'APPROVAL';
 
 export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW');
@@ -99,6 +99,11 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [importing, setImporting] = useState(false);
   const [showImportPreview, setShowImportPreview] = useState(false);
 
+  // 达人审核状态
+  const [pendingAffiliates, setPendingAffiliates] = useState<User[]>([]);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectingUserId, setRejectingUserId] = useState<string | null>(null);
+
   const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1FrjSNSrNZTMgWl1dDBZIOTWQOgEO7An9UKNxUmRepG0/edit?gid=1698530545#gid=1698530545";
 
   // 获取真实的全局统计数据
@@ -138,12 +143,14 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       const aff = await MockStore.getAffiliates();
       const ov = await MockStore.getAdminOverviewStats();
       const withdrawalList = await MockStore.getAllWithdrawals();
+      const pending = await MockStore.getPendingAffiliates(); // 获取待审核达人
 
       setTasks(taskList);
       setStats(s);
       setAffiliates(aff);
       setOverviewData(ov);
       setWithdrawals(withdrawalList);
+      setPendingAffiliates(pending);
 
       // 获取真实数据
       await fetchRealTotalStats();
@@ -557,6 +564,46 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     }
   };
 
+  // 批准达人
+  const handleApproveAffiliate = async (userId: string) => {
+    try {
+      await MockStore.approveAffiliate(userId);
+      // 刷新待审核列表
+      const pending = await MockStore.getPendingAffiliates();
+      setPendingAffiliates(pending);
+      // 刷新全部达人列表
+      const aff = await MockStore.getAffiliates();
+      setAffiliates(aff);
+      alert('Affiliate approved successfully!');
+    } catch (error) {
+      console.error('Failed to approve affiliate:', error);
+      alert('Failed to approve affiliate');
+    }
+  };
+
+  // 拒绝达人
+  const handleRejectAffiliate = async (userId: string) => {
+    if (!rejectionReason.trim()) {
+      alert('Please provide a rejection reason');
+      return;
+    }
+    try {
+      await MockStore.rejectAffiliate(userId, rejectionReason);
+      // 刷新待审核列表
+      const pending = await MockStore.getPendingAffiliates();
+      setPendingAffiliates(pending);
+      // 刷新全部达人列表
+      const aff = await MockStore.getAffiliates();
+      setAffiliates(aff);
+      setRejectingUserId(null);
+      setRejectionReason('');
+      alert('Affiliate rejected');
+    } catch (error) {
+      console.error('Failed to reject affiliate:', error);
+      alert('Failed to reject affiliate');
+    }
+  };
+
   // 切换任务参与者显示
   const handleToggleParticipants = async (taskId: string) => {
     const isExpanded = expandedTasks.has(taskId);
@@ -594,15 +641,21 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
             { id: 'TASKS', icon: FileText, label: t('admin.tasks') },
             { id: 'AFFILIATES', icon: Users, label: t('admin.affiliates') },
             { id: 'WITHDRAWALS', icon: Wallet, label: '提现管理' },
+            { id: 'APPROVAL', icon: UserCheck, label: 'Affiliate Approval', badge: pendingAffiliates.length },
         ].map((item) => (
             <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as Tab)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
                     activeTab === item.id ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
             >
                 <item.icon size={16} /> {item.label}
+                {item.badge && item.badge > 0 && (
+                    <span className="ml-1 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                        {item.badge}
+                    </span>
+                )}
             </button>
         ))}
     </div>
@@ -1333,6 +1386,172 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     </div>
     );
   };
+
+  // 渲染达人审核页面
+  const renderApproval = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Affiliate Approval</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Review and approve new affiliate registrations
+          </p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400" />
+          <span className="text-sm font-medium text-amber-900 dark:text-amber-300">
+            {pendingAffiliates.length} Pending
+          </span>
+        </div>
+      </div>
+
+      {pendingAffiliates.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full mb-4">
+              <CheckCircle size={32} className="text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              All Caught Up!
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400">
+              No pending affiliate registrations to review
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {pendingAffiliates.map(affiliate => (
+            <div
+              key={affiliate.id}
+              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4 flex-1">
+                  <img
+                    src={affiliate.avatar}
+                    alt={affiliate.name}
+                    className="w-16 h-16 rounded-full border-2 border-slate-200 dark:border-slate-700"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                        {affiliate.name}
+                      </h3>
+                      <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">
+                        PENDING
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-3">
+                      <Mail size={14} />
+                      {affiliate.email}
+                    </div>
+
+                    {/* 社交媒体链接 */}
+                    {affiliate.socialLinks && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {affiliate.socialLinks.twitter && (
+                          <a
+                            href={affiliate.socialLinks.twitter}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                          >
+                            <Twitter size={12} />
+                            Twitter
+                          </a>
+                        )}
+                        {affiliate.socialLinks.youtube && (
+                          <a
+                            href={affiliate.socialLinks.youtube}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-medium hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                          >
+                            <Youtube size={12} />
+                            YouTube
+                          </a>
+                        )}
+                        {affiliate.socialLinks.instagram && (
+                          <a
+                            href={affiliate.socialLinks.instagram}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 rounded-lg text-xs font-medium hover:bg-pink-100 dark:hover:bg-pink-900/30 transition-colors"
+                          >
+                            <Instagram size={12} />
+                            Instagram
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 粉丝数 */}
+                    {affiliate.followerCount && (
+                      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                        <Users size={14} />
+                        <span>{affiliate.followerCount.toLocaleString()} followers</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 操作按钮 */}
+                <div className="flex gap-2 ml-4">
+                  {rejectingUserId === affiliate.id ? (
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="text"
+                        placeholder="Rejection reason..."
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-red-500"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setRejectingUserId(null);
+                            setRejectionReason('');
+                          }}
+                          className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleRejectAffiliate(affiliate.id)}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Confirm Reject
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleApproveAffiliate(affiliate.id)}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <CheckCircle size={16} />
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => setRejectingUserId(affiliate.id)}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <UserX size={16} />
+                        Reject
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   const renderAffiliates = () => {
     // 添加等级筛选状态
@@ -2149,6 +2368,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         {activeTab === 'TASKS' && renderTasks()}
         {activeTab === 'AFFILIATES' && renderAffiliates()}
         {activeTab === 'WITHDRAWALS' && renderWithdrawals()}
+        {activeTab === 'APPROVAL' && renderApproval()}
       </div>
 
       {/* 异常预警详情模态框 */}

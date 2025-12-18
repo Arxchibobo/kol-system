@@ -1,4 +1,4 @@
-import { User, Task, AffiliateTask, UserRole, Tier, TaskStatus, Settlement, SettlementStatus, TIER_RATES } from '../types';
+import { User, Task, AffiliateTask, UserRole, Tier, TaskStatus, Settlement, SettlementStatus, TIER_RATES, ApprovalStatus } from '../types';
 
 // Initial Mock Data Structure (will be hydrated from localStorage)
 const MOCK_ADMIN: User = {
@@ -204,6 +204,7 @@ export const MockStore = {
         email: data.email,
         role: UserRole.AFFILIATE,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`,
+        approvalStatus: ApprovalStatus.PENDING, // 新注册用户默认为待审核状态
         tier: Tier.CORE_PARTNER, // 默认设置为基础合作伙伴
         totalEarnings: 0,
         pendingEarnings: 0,
@@ -1129,6 +1130,36 @@ export const MockStore = {
     } catch (error: any) {
       console.error('[MockStore] ❌ KOL 数据同步失败:', error);
       return { success: 0, skipped: 0 };
+    }
+  },
+
+  // 获取待审核的达人列表
+  getPendingAffiliates: async (): Promise<User[]> => {
+    await new Promise(r => setTimeout(r, 100));
+    return MOCK_AFFILIATES.filter(u => u.approvalStatus === ApprovalStatus.PENDING);
+  },
+
+  // 批准达人
+  approveAffiliate: async (userId: string): Promise<void> => {
+    await new Promise(r => setTimeout(r, 500));
+    const user = MOCK_AFFILIATES.find(u => u.id === userId);
+    if (user) {
+      user.approvalStatus = ApprovalStatus.APPROVED;
+      user.rejectionReason = undefined; // 清除拒绝原因
+      saveData();
+      console.log(`[MockStore] ✅ 已批准达人: ${user.name} (${user.email})`);
+    }
+  },
+
+  // 拒绝达人
+  rejectAffiliate: async (userId: string, reason: string): Promise<void> => {
+    await new Promise(r => setTimeout(r, 500));
+    const user = MOCK_AFFILIATES.find(u => u.id === userId);
+    if (user) {
+      user.approvalStatus = ApprovalStatus.REJECTED;
+      user.rejectionReason = reason;
+      saveData();
+      console.log(`[MockStore] ❌ 已拒绝达人: ${user.name} (${user.email}), 原因: ${reason}`);
     }
   }
 };

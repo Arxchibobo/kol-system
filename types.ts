@@ -28,12 +28,20 @@ export enum WithdrawalStatus {
   REJECTED = 'REJECTED'      // 已拒绝
 }
 
+export enum ApprovalStatus {
+  PENDING = 'PENDING',       // 待审核
+  APPROVED = 'APPROVED',     // 已批准
+  REJECTED = 'REJECTED'      // 已拒绝
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
   avatar: string;
+  approvalStatus?: ApprovalStatus; // 审核状态（仅适用于达人）
+  rejectionReason?: string; // 拒绝原因（如果被拒绝）
   // Affiliate specific fields
   tier?: Tier;
   totalEarnings?: number;

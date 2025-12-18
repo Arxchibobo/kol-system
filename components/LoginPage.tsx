@@ -57,6 +57,16 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
     setLoading(true);
     const user = await MockStore.login(email);
     if (user) {
+      // 检查审核状态
+      if (user.approvalStatus === 'PENDING') {
+        alert('Your account is pending approval. Please wait for the admin team to review your registration.');
+        setLoading(false);
+        return;
+      } else if (user.approvalStatus === 'REJECTED') {
+        alert(`Your account has been rejected. Reason: ${user.rejectionReason || 'Not specified'}. Please contact support at bobo@myshell.ai`);
+        setLoading(false);
+        return;
+      }
       onLogin(user);
     } else {
       setShowRegPrompt(true);
@@ -89,6 +99,16 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
                 tiktok: regTiktok
             }
         });
+
+        // 检查审核状态
+        if (user.approvalStatus === 'PENDING') {
+          alert('Registration submitted successfully! Your account is pending approval by the admin team. You will be notified once approved.');
+          // 不允许登录，返回登录页面
+          setIsRegistering(false);
+          setLoading(false);
+          return;
+        }
+
         onLogin(user);
     } catch (e) {
         console.error(e);
