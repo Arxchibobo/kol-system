@@ -80,6 +80,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   // 标签分类系统 - Tag classification system
   const AVAILABLE_TAGS = ['AI Creator', 'Fashion', 'Lifestyle', 'Tech', 'Gaming', 'Food', 'Travel', 'Other'];
   const [selectedTag, setSelectedTag] = useState<string>('All');
+  const [selectedTier, setSelectedTier] = useState<string>('All'); // 🔧 移到组件顶层，修复 React #310 错误
 
   // Manual Add KOL State
   const [showAddKolModal, setShowAddKolModal] = useState(false);
@@ -1554,15 +1555,14 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   );
 
   const renderAffiliates = () => {
-    // 添加等级筛选状态
-    const [selectedTier, setSelectedTier] = React.useState<string>('全部');
+    // 🔧 已将 selectedTier 状态移到组件顶层，避免在渲染函数中调用 useState
 
     // 根据搜索、标签和等级筛选达人
     const filteredAffiliates = affiliates.filter(a => {
         const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                              a.email.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesTag = selectedTag === 'All' || (a.tags && a.tags.includes(selectedTag));
-        const matchesTier = selectedTier === '全部' || a.tier === selectedTier;
+        const matchesTier = selectedTier === 'All' || a.tier === selectedTier;
         return matchesSearch && matchesTag && matchesTier;
     });
 
