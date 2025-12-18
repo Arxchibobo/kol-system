@@ -28,7 +28,8 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
 
   // Modal State
   const [showRegPrompt, setShowRegPrompt] = useState(false);
-  
+  const [showImportantNotice, setShowImportantNotice] = useState(false); // 重要提示弹窗
+
   // Admin Login State
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
@@ -119,6 +120,11 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
 
   const switchToRegister = () => {
     setShowRegPrompt(false);
+    setShowImportantNotice(true); // 显示重要提示
+  };
+
+  const confirmAndProceedToRegister = () => {
+    setShowImportantNotice(false);
     setIsRegistering(true);
     setRegEmail(email);
   };
@@ -439,9 +445,68 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
             </div>
         )}
 
+        {/* Important Notice Modal - 重要提示弹窗 */}
+        {showImportantNotice && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-2xl w-full p-8 border border-slate-200 dark:border-slate-800">
+                    <div className="flex items-start gap-4 mb-6">
+                        <div className="flex-shrink-0 w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                            <Shield className="text-amber-600 dark:text-amber-400" size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+                                Important Notice
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                重要提示
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl p-6 mb-6">
+                        <div className="space-y-4 text-slate-700 dark:text-slate-300">
+                            <p className="leading-relaxed">
+                                To ensure fair rewards and proper tracking, <strong className="text-amber-700 dark:text-amber-400">only creators approved by MyShell and officially listed as affiliates</strong> are eligible for task rewards and payouts.
+                            </p>
+                            <p className="leading-relaxed">
+                                Please submit your social media links to <a href="mailto:artshare@myshell.ai" className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">artshare@myshell.ai</a> for review <strong className="text-amber-700 dark:text-amber-400">before registration</strong>.
+                            </p>
+                            <p className="leading-relaxed font-semibold text-amber-900 dark:text-amber-300">
+                                ⚠️ Unapproved creators or registrations not recorded in our affiliate list will not be paid under any circumstances.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-100 dark:bg-slate-800/50 rounded-xl p-4 mb-6 text-sm text-slate-600 dark:text-slate-400">
+                        <p className="mb-2">
+                            <strong>提示：</strong>为确保公平奖励和正确追踪，只有经过 MyShell 批准并正式列入达人名单的创作者才有资格获得任务奖励和付款。
+                        </p>
+                        <p>
+                            请在注册前将您的社交媒体链接提交至 <a href="mailto:artshare@myshell.ai" className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">artshare@myshell.ai</a> 进行审核。未经批准的创作者或未记录在我们达人列表中的注册将在任何情况下都不会获得付款。
+                        </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setShowImportantNotice(false)}
+                            className="flex-1 px-6 py-3 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors font-medium"
+                        >
+                            Cancel / 取消
+                        </button>
+                        <button
+                            onClick={confirmAndProceedToRegister}
+                            className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors font-medium"
+                        >
+                            I Understand, Continue / 我已了解，继续
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Hidden Admin Entry */}
         <div className="fixed bottom-4 right-4 z-50 opacity-30 hover:opacity-100 transition-opacity">
-            <button 
+            <button
                 onClick={onAdminClick}
                 className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 bg-white/50 dark:bg-slate-900/50 px-2 py-1 rounded"
             >
