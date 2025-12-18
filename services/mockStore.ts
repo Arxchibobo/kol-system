@@ -639,17 +639,57 @@ export const MockStore = {
   // 获取任务的参与达人列表
   getTaskParticipants: async (taskId: string) => {
     try {
+      // 🔧 优先尝试从后端获取
       const response = await fetch(`/api/tasks/${taskId}/participants`);
-      if (!response.ok) {
-        throw new Error('获取任务参与者失败');
+      if (response.ok) {
+        const participants = await response.json();
+        console.log('[MockStore] 从后端获取任务参与者:', participants.length);
+        return participants;
       }
-      const participants = await response.json();
-      console.log('[MockStore] 获取任务参与者:', participants.length);
-      return participants;
     } catch (error: any) {
-      console.error('[MockStore] 获取任务参与者失败:', error);
-      return [];
+      console.log('[MockStore] 后端不可用，使用本地数据');
     }
+
+    // 🔧 Fallback: 从本地数据构建参与者列表
+    const affiliateTasks = MOCK_AFFILIATE_TASKS.filter(at => at.taskId === taskId);
+    console.log('[MockStore] 本地找到的任务参与:', affiliateTasks.length);
+
+    const participants = await Promise.all(
+      affiliateTasks.map(async (at) => {
+        // 查找对应的达人信息
+        const affiliate = MOCK_AFFILIATES.find(a => a.id === at.affiliateId);
+
+        // 🔧 尝试从后端获取实时点击数据
+        let clickCount = at.stats?.totalClicks || 0;
+        try {
+          const clickResponse = await fetch(`/api/tracking-links/stats?creator_user_id=${at.affiliateId}&task_id=${taskId}`);
+          if (clickResponse.ok) {
+            const clickData = await clickResponse.json();
+            clickCount = clickData.click_count || 0;
+            console.log(`[MockStore] 达人 ${affiliate?.name} 的点击数: ${clickCount}`);
+          }
+        } catch (e) {
+          console.log('[MockStore] 无法获取实时点击数，使用本地数据');
+        }
+
+        return {
+          affiliateTaskId: at.id,
+          affiliateId: at.affiliateId,
+          affiliateName: affiliate?.name || 'Unknown',
+          affiliateEmail: affiliate?.email || 'N/A',
+          affiliateTier: affiliate?.tier || 'CORE_PARTNER',
+          totalClicks: clickCount,
+          validClicks: at.stats?.validClicks || 0,
+          estimatedEarnings: at.stats?.estimatedEarnings || 0,
+          status: at.status || 'CLAIMED',
+          submittedPostLink: at.submittedPostLink || '',
+          trackingLink: at.uniqueTrackingLink || ''
+        };
+      })
+    );
+
+    console.log('[MockStore] 最终返回的参与者列表:', participants.length, participants);
+    return participants;
   },
 
   getStats: async (userId: string, role: UserRole) => {
