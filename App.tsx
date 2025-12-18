@@ -209,7 +209,7 @@ function AppContent() {
         {user.role === UserRole.ADMIN ? (
           <AdminDashboard user={user} />
         ) : (
-          <AffiliateDashboard user={user} />
+          <AffiliateDashboard user={user} onLogout={handleLogout} />
         )}
       </main>
     </div>

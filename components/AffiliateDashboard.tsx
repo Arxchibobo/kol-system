@@ -11,11 +11,12 @@ import { WelcomeModal } from './WelcomeModal';
 
 interface Props {
   user: User;
+  onLogout?: () => void; // 添加登出回调函数
 }
 
 type Tab = 'DASHBOARD' | 'MARKET' | 'MY_TASKS' | 'WITHDRAWALS' | 'PROFILE';
 
-export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
+export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('DASHBOARD');
   const [dashboardUser, setDashboardUser] = useState<User>(initialUser); // Local user state for live updates
   const [allTasks, setAllTasks] = useState<Task[]>([]); // Store all tasks for lookup
@@ -133,9 +134,19 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     console.log('[达人端] 已领取的任务ID:', Array.from(claimedIds));
     console.log('[达人端] 可用任务:', available.length, available);
 
+    // 🔧 过滤掉对应任务已被删除的 AffiliateTask（修复 Unknown Task 问题）
+    const validTaskIds = new Set(t.map(task => task.id));
+    const validMyTasks = updatedMyTasks.filter(at => {
+      const exists = validTaskIds.has(at.taskId);
+      if (!exists) {
+        console.warn(`[达人端] ⚠️  过滤掉已删除的任务: ${at.taskId}`);
+      }
+      return exists;
+    });
+
     setAllTasks(t);
     setAvailableTasks(available);
-    setMyTasks(updatedMyTasks);
+    setMyTasks(validMyTasks); // 使用过滤后的列表
     setStats(s);
 
       // 4. 获取我的提现记录
@@ -483,21 +494,38 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser }) => {
     }
 
     try {
+      console.log(`[达人侧] 正在删除账户: ${dashboardUser.id}`);
+
+      // 调用后端 API 删除账户（包括数据库和 localStorage）
       const response = await fetch(`/api/user/${dashboardUser.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
 
       if (response.ok) {
+        console.log('[达人侧] 账户删除成功，清除本地数据');
+
+        // 清除所有本地存储的数据
+        localStorage.removeItem('myshell_user');
+        localStorage.removeItem('myshell_affiliates');
+        localStorage.removeItem('myshell_aff_tasks');
+
         alert('Your account has been successfully deleted. You will be logged out now.');
-        // 登出并重定向到登录页
-        window.location.href = '/';
+
+        // 使用 onLogout 回调函数正确登出
+        if (onLogout) {
+          onLogout();
+        } else {
+          // 如果没有 onLogout 回调，强制刷新页面回到登录页
+          window.location.href = '/';
+        }
       } else {
-        throw new Error('Failed to delete account');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete account');
       }
-    } catch (error) {
-      console.error('Delete account failed:', error);
-      alert('Failed to delete account. Please contact support at bobo@myshell.ai');
+    } catch (error: any) {
+      console.error('[达人侧] 删除账户失败:', error);
+      alert('Failed to delete account: ' + (error.message || 'Unknown error. Please contact support at bobo@myshell.ai'));
     }
   };
 
