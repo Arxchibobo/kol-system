@@ -153,6 +153,9 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       setWithdrawals(withdrawalList);
       setPendingAffiliates(pending);
 
+      // 🔧 调试日志：显示待审核达人数量
+      console.log('[Admin] 待审核达人数量:', pending.length, pending);
+
       // 获取真实数据
       await fetchRealTotalStats();
       await fetchAnomalies();
@@ -620,17 +623,17 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       newExpanded.add(taskId);
       setExpandedTasks(newExpanded);
 
-      // 如果还没加载过，则加载参与者数据
-      if (!taskParticipants[taskId]) {
-        try {
-          const participants = await MockStore.getTaskParticipants(taskId);
-          setTaskParticipants({
-            ...taskParticipants,
-            [taskId]: participants
-          });
-        } catch (error) {
-          console.error('加载参与者失败:', error);
-        }
+      // 🔧 每次展开都重新加载参与者数据，确保数据最新
+      try {
+        console.log(`[Admin] 正在加载任务 ${taskId} 的参与者...`);
+        const participants = await MockStore.getTaskParticipants(taskId);
+        console.log(`[Admin] 任务 ${taskId} 的参与者:`, participants.length, participants);
+        setTaskParticipants({
+          ...taskParticipants,
+          [taskId]: participants
+        });
+      } catch (error) {
+        console.error('[Admin] 加载参与者失败:', error);
       }
     }
   };

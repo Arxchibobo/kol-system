@@ -218,6 +218,16 @@ export const MockStore = {
     MOCK_AFFILIATES.unshift(newUser);
     saveData();
 
+    // 🔧 调试日志：确认新用户已注册
+    console.log('[MockStore] ✅ 新用户已注册，等待审核:', {
+      id: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      approvalStatus: newUser.approvalStatus
+    });
+    console.log('[MockStore] 当前 MOCK_AFFILIATES 数量:', MOCK_AFFILIATES.length);
+    console.log('[MockStore] 当前待审核用户数量:', MOCK_AFFILIATES.filter(u => u.approvalStatus === ApprovalStatus.PENDING).length);
+
     // 同步到后端数据库
     try {
         await fetch(`/api/user/profile/${newUser.id}`, {
@@ -485,8 +495,18 @@ export const MockStore = {
       stats: { totalClicks: 0, validClicks: 0, conversionRate: 0, estimatedEarnings: 0 }
     };
     MOCK_AFFILIATE_TASKS.push(newAT);
-    
+
     saveData();
+
+    // 🔧 调试日志：确认任务已认领
+    console.log('[MockStore] ✅ 任务已认领，任务记录:', {
+      affiliateTaskId: newAT.id,
+      affiliateId: newAT.affiliateId,
+      taskId: newAT.taskId,
+      trackingLink: newAT.uniqueTrackingLink
+    });
+    console.log('[MockStore] 当前 MOCK_AFFILIATE_TASKS 数量:', MOCK_AFFILIATE_TASKS.length);
+
     return newAT;
   },
 
@@ -651,8 +671,20 @@ export const MockStore = {
     }
 
     // 🔧 Fallback: 从本地数据构建参与者列表
+    console.log('[MockStore] 总共的 MOCK_AFFILIATE_TASKS:', MOCK_AFFILIATE_TASKS.length);
+    console.log('[MockStore] 查询的 taskId:', taskId);
+
     const affiliateTasks = MOCK_AFFILIATE_TASKS.filter(at => at.taskId === taskId);
-    console.log('[MockStore] 本地找到的任务参与:', affiliateTasks.length);
+    console.log('[MockStore] 本地找到的任务参与:', {
+      taskId,
+      count: affiliateTasks.length,
+      details: affiliateTasks.map(at => ({
+        id: at.id,
+        affiliateId: at.affiliateId,
+        status: at.status,
+        trackingLink: at.uniqueTrackingLink
+      }))
+    });
 
     const participants = await Promise.all(
       affiliateTasks.map(async (at) => {
