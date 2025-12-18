@@ -1064,5 +1064,71 @@ export const MockStore = {
       console.error('[MockStore] 标记所有通知已读失败:', error);
       throw error;
     }
+  },
+
+  // 🔧 修复：添加 autoImportAllKOLs 函数
+  // 自动同步 KOL 数据 - 从数据库加载所有达人信息
+  autoImportAllKOLs: async () => {
+    try {
+      console.log('[MockStore] 🔄 开始自动同步 KOL 数据...');
+
+      // 从数据库获取所有用户资料
+      const response = await fetch('/api/users/profiles');
+      if (!response.ok) {
+        console.warn('[MockStore] ⚠️ 无法获取用户资料，跳过同步');
+        return { success: 0, skipped: 0 };
+      }
+
+      const profiles = await response.json();
+      console.log(`[MockStore] 📊 获取到 ${profiles.length} 个用户资料`);
+
+      let success = 0;
+      let skipped = 0;
+
+      // 同步每个用户到本地存储
+      for (const profile of profiles) {
+        try {
+          // 检查是否已存在
+          const existingUser = MOCK_AFFILIATES.find(u => u.id === profile.user_id);
+          if (existingUser) {
+            skipped++;
+            continue;
+          }
+
+          // 创建新用户对象并添加到本地
+          const newUser: User = {
+            id: profile.user_id,
+            email: profile.email || `user_${profile.user_id}@example.com`,
+            name: profile.name || `User ${profile.user_id}`,
+            role: 'affiliate',
+            tier: profile.tier || 'CORE_PARTNER',
+            followerCount: profile.follower_count || 0,
+            tags: profile.tags || [],
+            walletAddress: profile.wallet_address || '',
+            totalEarnings: profile.total_earnings || 0,
+            pendingEarnings: profile.pending_earnings || 0,
+            validClicks: 0,
+            socialLinks: {},
+            notificationSettings: {
+              newTaskAlert: true
+            }
+          };
+
+          MOCK_AFFILIATES.push(newUser);
+          success++;
+        } catch (error) {
+          console.error(`[MockStore] ❌ 同步用户 ${profile.user_id} 失败:`, error);
+          skipped++;
+        }
+      }
+
+      saveData();
+      console.log(`[MockStore] ✅ KOL 数据同步完成: 成功 ${success}, 跳过 ${skipped}`);
+      return { success, skipped };
+
+    } catch (error: any) {
+      console.error('[MockStore] ❌ KOL 数据同步失败:', error);
+      return { success: 0, skipped: 0 };
+    }
   }
 };
