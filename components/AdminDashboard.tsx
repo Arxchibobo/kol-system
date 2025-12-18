@@ -640,7 +640,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
             { id: 'OVERVIEW', icon: LayoutGrid, label: t('admin.overview') },
             { id: 'TASKS', icon: FileText, label: t('admin.tasks') },
             { id: 'AFFILIATES', icon: Users, label: t('admin.affiliates') },
-            { id: 'WITHDRAWALS', icon: Wallet, label: '提现管理' },
+            { id: 'WITHDRAWALS', icon: Wallet, label: 'Withdrawals' },
             { id: 'APPROVAL', icon: UserCheck, label: 'Affiliate Approval', badge: pendingAffiliates.length },
         ].map((item) => (
             <button
@@ -1227,7 +1227,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         </div>
 
         <div className="flex justify-between items-center">
-             <h2 className="text-xl font-bold text-slate-900 dark:text-white">提现管理</h2>
+             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Withdrawal Management</h2>
              <div className="flex gap-2">
                {/* 导出按钮 */}
                <button
@@ -1320,7 +1320,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                     {withdrawals.length === 0 ? (
                         <tr>
                             <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                                暂无提现申请
+                                No withdrawal requests
                             </td>
                         </tr>
                     ) : (
@@ -1601,7 +1601,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             {importing ? (
                                 <>
                                     <RefreshCw size={16} className="animate-spin" />
-                                    导入中...
+                                    Importing...
                                 </>
                             ) : (
                                 <>
@@ -1906,7 +1906,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                                             </span>
                                                                         ))
                                                                     ) : (
-                                                                        <span className="text-sm text-slate-400">暂无标签</span>
+                                                                        <span className="text-sm text-slate-400">No tags</span>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -2181,7 +2181,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                 onClick={handleCancelImport}
                                 className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                             >
-                                取消
+                                Cancel
                             </button>
                         </div>
                     </div>
@@ -2306,7 +2306,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                 className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                                 disabled={importing}
                             >
-                                取消
+                                Cancel
                             </button>
                             <button
                                 onClick={handleConfirmImport}
@@ -2316,11 +2316,11 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                 {importing ? (
                                     <>
                                         <RefreshCw size={16} className="animate-spin" />
-                                        导入中...
+                                        Importing...
                                     </>
                                 ) : (
                                     <>
-                                        确认导入 {importResult.success} 个 KOL
+                                        Confirm Import {importResult.success} KOLs
                                     </>
                                 )}
                             </button>
@@ -2352,10 +2352,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
           <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full transition-colors">
               <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`}></div>
               <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                {refreshing ? '同步中...' : '实时同步'}
+                {refreshing ? 'Syncing...' : 'Live Sync'}
               </span>
               <span className="text-xs text-slate-400">
-                (每 10 秒)
+                (every 10s)
               </span>
           </div>
         </div>
@@ -2505,7 +2505,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                     {anomalies.length === 0 ? (
                         <div className="text-center py-12 text-slate-500">
                             <CheckCircle size={48} className="mx-auto mb-4 text-emerald-500" />
-                            <p>暂无异常预警</p>
+                            <p>No anomalies detected</p>
                         </div>
                     ) : (
                         <div className="space-y-4">

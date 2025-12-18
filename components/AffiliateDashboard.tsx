@@ -665,7 +665,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
           {notifications.length === 0 ? (
             <div className="p-8 text-center">
               <Bell size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-700" />
-              <p className="text-slate-500 dark:text-slate-400 text-sm">暂无通知</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">No notifications</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -725,7 +725,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
             { id: 'DASHBOARD', icon: LayoutGrid, label: t('affiliate.dashboard') },
             { id: 'MARKET', icon: Target, label: t('affiliate.market') },
             { id: 'MY_TASKS', icon: BarChart3, label: t('affiliate.myTasks') },
-            { id: 'WITHDRAWALS', icon: Wallet, label: '提现记录' },
+            { id: 'WITHDRAWALS', icon: Wallet, label: 'Withdrawals' },
             { id: 'PROFILE', icon: SettingsIcon, label: t('affiliate.profile') },
         ].map((item) => (
             <button
@@ -893,16 +893,16 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                         <div className="flex items-center justify-between text-sm">
                             <div className="flex items-center text-slate-700 dark:text-slate-300">
                                 <DollarSign size={14} className="mr-2 text-emerald-600 dark:text-emerald-400"/>
-                                <span>您的奖励</span>
+                                <span>Your Reward</span>
                             </div>
                             <div className="text-right">
                                 <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
                                     ${getTaskRewardRate(task)}<span className="text-xs text-slate-500">/1000 clicks</span>
                                 </p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    {dashboardUser.tier === Tier.OFFICIAL_COLLABORATOR ? '官方合作者' :
-                                     dashboardUser.tier === Tier.PREMIUM_INFLUENCER ? '高级影响者' :
-                                     '核心伙伴'} 等级
+                                    {dashboardUser.tier === Tier.OFFICIAL_COLLABORATOR ? 'Official Collaborator' :
+                                     dashboardUser.tier === Tier.PREMIUM_INFLUENCER ? 'Premium Influencer' :
+                                     'Core Partner'} Tier
                                 </p>
                             </div>
                         </div>
@@ -1154,13 +1154,13 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
       {activeTab === 'MY_TASKS' && renderMyTasks()}
       {activeTab === 'WITHDRAWALS' && (
         <div className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">我的提现记录</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">My Withdrawal History</h2>
 
           {myWithdrawals.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center">
               <Wallet size={48} className="mx-auto mb-4 text-slate-400" />
-              <p className="text-slate-500 dark:text-slate-400">暂无提现记录</p>
-              <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">完成任务并达到最低提现金额后即可申请提现</p>
+              <p className="text-slate-500 dark:text-slate-400">No withdrawal records yet</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">Complete tasks and reach the minimum withdrawal amount to request a payout</p>
             </div>
           ) : (
             <div className="space-y-4">
