@@ -88,9 +88,9 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
 
       // 2. Fetch Tasks and Stats
       const t = await MockStore.getTasks(initialUser.role);
-      console.log('[达人端] 获取到的所有任务:', t.length, t);
+      console.log('[Affiliate] Fetched all tasks:', t.length, t);
       const mt = await MockStore.getMyTasks(initialUser.id);
-      console.log('[达人端] 我的任务:', mt.length, mt);
+      console.log('[Affiliate] My tasks:', mt.length, mt);
       const s = await MockStore.getStats(initialUser.id, initialUser.role);
 
     // 3. 从后端 API 获取每个任务的真实点击统计
@@ -100,7 +100,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                 const statsRes = await fetch(`/api/stats/affiliate/${initialUser.id}/task/${task.taskId}`);
                 if (statsRes.ok) {
                     const stats = await statsRes.json();
-                    console.log(`[前端] 获取任务 ${task.taskId} 点击统计:`, stats);
+                    console.log(`[Frontend] Fetched task ${task.taskId} click stats:`, stats);
 
                     // 计算预估收益 - 根据任务配置和用户等级
                     const userTier = refreshedUser?.tier || Tier.CORE_PARTNER;
@@ -124,11 +124,11 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                         }
                     };
                 } else {
-                    console.warn(`[前端] 获取任务 ${task.taskId} 统计失败，使用默认值`);
+                    console.warn(`[Frontend] Failed to fetch task ${task.taskId} stats, using defaults`);
                     return task;
                 }
             } catch (error) {
-                console.error(`[前端] 获取任务 ${task.taskId} 统计出错:`, error);
+                console.error(`[Frontend] Error fetching task ${task.taskId} stats:`, error);
                 return task;
             }
         })
@@ -137,65 +137,51 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
     // Filter out tasks already claimed
     const claimedIds = new Set(mt.map(i => i.taskId));
     const available = t.filter(task => !claimedIds.has(task.id) && task.status === 'ACTIVE');
-    console.log('[达人端] 已领取的任务ID:', Array.from(claimedIds));
-    console.log('[达人端] 可用任务:', available.length, available);
+    console.log('[Affiliate] Claimed task IDs:', Array.from(claimedIds));
+    console.log('[Affiliate] Available tasks:', available.length, available);
 
-    // 🔧 过滤掉对应任务已被删除的 AffiliateTask（修复 Unknown Task 问题）
+    // Filter out AffiliateTask entries where corresponding task has been deleted (fixes Unknown Task issue)
     const validTaskIds = new Set(t.map(task => task.id));
     const validMyTasks = updatedMyTasks.filter(at => {
       const exists = validTaskIds.has(at.taskId);
       if (!exists) {
-        console.warn(`[达人端] ⚠️  过滤掉已删除的任务: ${at.taskId}`);
+        console.warn(`[Affiliate] ⚠️  Filtered out deleted task: ${at.taskId}`);
       }
       return exists;
     });
 
     setAllTasks(t);
     setAvailableTasks(available);
-    setMyTasks(validMyTasks); // 使用过滤后的列表
+    setMyTasks(validMyTasks); // Use filtered list
     setStats(s);
 
-    // 🔧 修复：初始化任务链接状态（避免在渲染时更新状态）
-    const initialLinks: Record<string, string[]> = {};
-    validMyTasks.forEach(task => {
-      if (!taskPostLinks[task.id]) {
-        const existingLinks = task.submittedPostLink
-          ? task.submittedPostLink.split('\n').filter(l => l.trim())
-          : [];
-        initialLinks[task.id] = existingLinks.length > 0 ? existingLinks : [''];
-      }
-    });
-    if (Object.keys(initialLinks).length > 0) {
-      setTaskPostLinks(prev => ({ ...prev, ...initialLinks }));
-    }
-
-      // 4. 获取我的提现记录
+      // 4. Fetch my withdrawal records
       const withdrawals = await MockStore.getAffiliateWithdrawals(initialUser.id);
       setMyWithdrawals(withdrawals);
-      console.log('[达人端] 提现记录:', withdrawals.length, withdrawals);
+      console.log('[Affiliate] Withdrawal records:', withdrawals.length, withdrawals);
 
-      // 5. 获取通知和未读数量
+      // 5. Fetch notifications and unread count
       const notifs = await MockStore.getNotifications(initialUser.id);
       const unread = await MockStore.getUnreadNotificationCount(initialUser.id);
       setNotifications(notifs);
       setUnreadCount(unread);
-      console.log('[达人端] 通知:', notifs.length, '未读:', unread);
+      console.log('[Affiliate] Notifications:', notifs.length, 'Unread:', unread);
 
       // 6. 检测新任务并显示提醒
       if (refreshedUser) {
         const lastSeen = refreshedUser.lastSeenTaskTimestamp || '1970-01-01';
         const newTasks = available.filter(task => task.createdAt > lastSeen);
 
-        // 如果有新任务且用户开启了通知，并且当前没有显示提醒，则显示提醒
+        // If there are new tasks and user has notifications enabled and no alert is currently shown, display alert
         if (newTasks.length > 0 && refreshedUser.notificationSettings?.newTaskAlert !== false && !showNewTaskAlert) {
           setNewTasksCount(newTasks.length);
           setShowNewTaskAlert(true);
-          console.log(`[前端] 检测到 ${newTasks.length} 个新任务，显示提醒`);
+          console.log(`[Frontend] Detected ${newTasks.length} new tasks, showing alert`);
         }
       }
     } catch (error) {
-      console.error('[前端] 加载数据失败:', error);
-      // 不影响用户界面，静默失败
+      console.error('[Frontend] Failed to load data:', error);
+      // Silent failure, doesn't affect UI
     }
   }, [initialUser, showNewTaskAlert]);
 
@@ -214,22 +200,44 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
     }
   }, [initialUser.id]);
 
-  // 实时同步：每 5 秒自动刷新数据（包括检测新任务）
+  // Real-time sync: auto-refresh data every 5 seconds (includes new task detection)
   useEffect(() => {
-    console.log('🔄 [达人端] 启动自动同步，每 5 秒刷新一次');
+    console.log('🔄 [Affiliate] Starting auto-sync, refreshing every 5 seconds');
 
-    // 设置定时器，每 5 秒刷新一次
+    // Set interval timer to refresh every 5 seconds
     const intervalId = setInterval(() => {
-      console.log('⏰ [达人端] 自动刷新数据并检测新任务...');
+      console.log('⏰ [Affiliate] Auto-refreshing data and detecting new tasks...');
       loadData();
-    }, 5000); // 5 秒，让新任务提醒更及时
+    }, 5000); // 5 seconds for more timely new task alerts
 
-    // 清理定时器
+    // Cleanup interval
     return () => {
-      console.log('🛑 [达人端] 停止自动同步');
+      console.log('🛑 [Affiliate] Stopping auto-sync');
       clearInterval(intervalId);
     };
-  }, [loadData]); // 依赖 loadData，确保使用最新的函数
+  }, [loadData]); // Depend on loadData to ensure we use the latest function
+
+  // 🔧 修复：使用 useEffect 初始化链接，但避免循环依赖
+  useEffect(() => {
+    if (myTasks.length > 0) {
+      setTaskPostLinks(prev => {
+        const newLinks = { ...prev };
+        let hasChanges = false;
+
+        myTasks.forEach(task => {
+          if (!newLinks[task.id]) {
+            const existingLinks = task.submittedPostLink
+              ? task.submittedPostLink.split('\n').filter(l => l.trim())
+              : [];
+            newLinks[task.id] = existingLinks.length > 0 ? existingLinks : [''];
+            hasChanges = true;
+          }
+        });
+
+        return hasChanges ? newLinks : prev;
+      });
+    }
+  }, [myTasks.map(t => t.id).join(',')]); // 仅依赖任务 ID 列表
 
   // 点击 "Confirm & Claim" 按钮 - 先显示任务指引
   const handleConfirmClaim = (task: Task) => {
@@ -258,10 +266,10 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
 
       // 重新加载数据以确保状态同步（不阻塞UI）
       loadData().catch(err => {
-        console.error('[前端] 领取成功但刷新数据失败:', err);
+        console.error('[Frontend] Claimed successfully but failed to refresh data:', err);
       });
     } catch (error: any) {
-      console.error('[前端] 领取任务失败:', error);
+      console.error('[Frontend] Failed to claim task:', error);
 
       // 关闭指引弹窗
       setShowGuideModal(false);
@@ -293,15 +301,15 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
   };
   
   const handleGiveUp = async (affTaskId: string) => {
-      if (window.confirm('确定要放弃这个任务吗？此操作不可撤销。')) {
+      if (window.confirm('Are you sure you want to give up this task? This action cannot be undone.')) {
           try {
             await MockStore.releaseTask(affTaskId);
-            alert('任务已成功释放');
+            alert('Task released successfully');
             // 重新加载数据以刷新可用任务列表
             await loadData();
           } catch (error: any) {
-            console.error('[前端] 放弃任务失败:', error);
-            alert('放弃任务失败: ' + error.message);
+            console.error('[Frontend] Failed to give up task:', error);
+            alert('Task release failed: ' + error.message);
           }
       }
   };
@@ -345,7 +353,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
         paymentDetails: withdrawalForm.paymentDetails
       });
 
-      alert('提现申请已提交，请等待审核');
+      alert('Withdrawal request submitted, please wait for review');
       setShowWithdrawalModal(false);
       setWithdrawalForm({ paymentMethod: 'PayPal', paymentDetails: '' });
 
@@ -353,7 +361,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
       const withdrawals = await MockStore.getAffiliateWithdrawals(dashboardUser.id);
       setMyWithdrawals(withdrawals);
     } catch (error: any) {
-      alert(error?.message || '提现申请失败，请重试');
+      alert(error?.message || 'Withdrawal request failed, please try again');
     }
   };
 
@@ -417,7 +425,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
   const handleRefreshStats = async () => {
     setRefreshing(true);
     loadData().catch(err => {
-      console.error('[前端] 手动刷新数据失败:', err);
+      console.error('[Frontend] Manual data refresh failed:', err);
     }).finally(() => {
       setTimeout(() => setRefreshing(false), 500);
     });
@@ -496,7 +504,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
 
       // 重新加载数据（不阻塞UI）
       loadData().catch(err => {
-        console.error('[前端] 保存成功但刷新数据失败:', err);
+        console.error('[Frontend] Saved successfully but failed to refresh data:', err);
       });
       alert('Profile saved successfully');
     } catch (error) {
@@ -557,16 +565,16 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
     }
 
     try {
-      console.log(`[达人侧] 正在删除账户: ${dashboardUser.id}`);
+      console.log(`[Affiliate] Deleting account: ${dashboardUser.id}`);
 
-      // 调用后端 API 删除账户（包括数据库和 localStorage）
+      // Call backend API to delete account (includes database and localStorage)
       const response = await fetch(`/api/user/${dashboardUser.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
 
       if (response.ok) {
-        console.log('[达人侧] 账户删除成功，清除本地数据');
+        console.log('[Affiliate] Account deletion successful, clearing local data');
 
         // 清除所有本地存储的数据
         localStorage.removeItem('myshell_user');
@@ -587,7 +595,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
         throw new Error(errorData.message || 'Failed to delete account');
       }
     } catch (error: any) {
-      console.error('[达人侧] 删除账户失败:', error);
+      console.error('[Affiliate] Account deletion failed:', error);
       alert('Failed to delete account: ' + (error.message || 'Unknown error. Please contact support at bobo@myshell.ai'));
     }
   };
@@ -602,7 +610,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('标记通知已读失败:', error);
+      console.error('Failed to mark notification as read:', error);
     }
   };
 
@@ -612,7 +620,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (error) {
-      console.error('标记所有通知已读失败:', error);
+      console.error('Failed to mark all notifications as read:', error);
     }
   };
 
@@ -952,7 +960,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                     {at.status === 'CLAIMED' && (
                         <button
                             onClick={() => {
-                                console.log('[达人端] 点击放弃任务按钮:', at.id, '状态:', at.status);
+                                console.log('[Affiliate] Clicked give up task button:', at.id, 'Status:', at.status);
                                 handleGiveUp(at.id);
                             }}
                             className="absolute top-4 right-4 text-slate-400 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-slate-200 dark:border-slate-700 hover:border-red-300 dark:hover:border-red-600"
@@ -1640,7 +1648,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
 
               <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <p className="text-xs text-yellow-800 dark:text-yellow-400">
-                  ⚠️ 提现申请提交后，运营团队将在 1-3 个工作日内处理。请确保收款信息准确无误。
+                  ⚠️ After submitting a withdrawal request, the operations team will process it within 1-3 business days. Please ensure your payment information is accurate.
                 </p>
               </div>
             </div>
@@ -1650,7 +1658,7 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
                 onClick={() => setShowWithdrawalModal(false)}
                 className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-lg font-medium"
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleSubmitWithdrawal}

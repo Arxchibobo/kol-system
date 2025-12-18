@@ -133,7 +133,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     setRefreshing(true);
     try {
       const taskList = await MockStore.getTasks(user.role);
-      console.log('[运营端] 获取到的任务列表:', taskList.length, taskList);
+      console.log('[Admin] Fetched task list:', taskList.length, taskList);
       const s = await MockStore.getStats(user.id, user.role);
       const aff = await MockStore.getAffiliates();
       const ov = await MockStore.getAdminOverviewStats();
@@ -155,25 +155,25 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     }
   };
 
-  // 实时同步：组件加载时立即刷新，然后每 10 秒自动刷新
+  // Real-time sync: refresh immediately on component load, then auto-refresh every 10 seconds
   useEffect(() => {
-    console.log('🔄 启动自动同步，每 10 秒刷新一次');
+    console.log('🔄 Starting auto-sync, refreshing every 10 seconds');
 
-    // 立即执行一次刷新
+    // Refresh immediately
     handleRefreshAll();
 
-    // 设置定时器，每 10 秒刷新一次
+    // Set interval timer to refresh every 10 seconds
     const intervalId = setInterval(() => {
-      console.log('⏰ 自动刷新任务列表...');
+      console.log('⏰ Auto-refreshing task list...');
       handleRefreshAll();
-    }, 10000); // 10 秒
+    }, 10000); // 10 seconds
 
-    // 清理定时器
+    // Cleanup interval
     return () => {
-      console.log('🛑 停止自动同步');
+      console.log('🛑 Stopping auto-sync');
       clearInterval(intervalId);
     };
-  }, []); // 空依赖数组，只在组件挂载时执行一次
+  }, []); // Empty dependency array - only run once on mount
 
   const openCreateModal = () => {
       setEditingTaskId(null);
@@ -285,32 +285,32 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const handleDeleteTask = async (task: Task) => {
     // 第一层确认
     const confirmed = window.confirm(
-      `确定要删除任务 "${task.title}" 吗？\n\n` +
-      `此操作将：\n` +
-      `1. 删除任务本身\n` +
-      `2. 删除所有达人的领取记录\n` +
-      `3. 删除所有相关的追踪链接和点击数据（如果存在）\n\n` +
-      `此操作不可撤销！`
+      `Are you sure you want to delete task "${task.title}"?\n\n` +
+      `This operation will:\n` +
+      `1. Delete the task itself\n` +
+      `2. Delete all affiliate claim records\n` +
+      `3. Delete all related tracking links and click data (if exists)\n\n` +
+      `This action cannot be undone!`
     );
 
     if (!confirmed) return;
 
     // 第二层确认：输入任务名称
     const confirmText = window.prompt(
-      `请输入任务名称 "${task.title}" 以确认删除：`
+      `Please enter the task name "${task.title}" to confirm deletion:`
     );
 
     if (confirmText !== task.title) {
-      alert('任务名称不匹配，删除已取消');
+      alert('Task name does not match, deletion cancelled');
       return;
     }
 
     try {
-      // 1. 从 MockStore (localStorage) 中删除任务
+      // 1. Delete task from MockStore (localStorage)
       const mockResult = await MockStore.deleteTask(task.id);
-      console.log('[前端] MockStore 删除成功:', mockResult);
+      console.log('[Frontend] MockStore deletion successful:', mockResult);
 
-      // 2. 同时调用后端 API 清理数据库中的追踪数据（如果存在）
+      // 2. Also call backend API to clean up tracking data in database (if exists)
       try {
         const response = await fetch(`/api/tasks/${task.id}`, {
           method: 'DELETE',
@@ -319,23 +319,23 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
         if (response.ok) {
           const dbResult = await response.json();
-          console.log('[后端] 数据库清理成功:', dbResult);
+          console.log('[Backend] Database cleanup successful:', dbResult);
         } else {
-          // 数据库删除失败不影响整体结果（可能表不存在）
-          console.warn('[后端] 数据库清理失败，但任务已从系统中移除');
+          // Database deletion failure doesn't affect overall result (table may not exist)
+          console.warn('[Backend] Database cleanup failed, but task removed from system');
         }
       } catch (dbError) {
-        console.warn('[后端] 数据库清理出错，但任务已从系统中移除:', dbError);
+        console.warn('[Backend] Database cleanup error, but task removed from system:', dbError);
       }
 
-      // 3. 显示成功消息并刷新列表
-      alert(`任务 "${task.title}" 删除成功！`);
+      // 3. Show success message and refresh list
+      alert(`Task "${task.title}" deleted successfully!`);
       const updatedList = await MockStore.getTasks(user.role);
       setTasks([...updatedList]);
 
     } catch (error: any) {
-      console.error('删除任务错误:', error);
-      alert(`删除失败：${error.message || '未知错误'}`);
+      console.error('Task deletion error:', error);
+      alert(`Deletion failed: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -459,8 +459,8 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       setImportResult(result);
       setShowImportPreview(true);
     } catch (error) {
-      console.error('CSV 解析失败:', error);
-      setSyncMessage('CSV 解析失败，请检查文件格式');
+      console.error('CSV parsing failed:', error);
+      setSyncMessage('CSV parsing failed, please check file format');
       setTimeout(() => setSyncMessage(null), 3000);
     } finally {
       setImporting(false);
@@ -485,8 +485,8 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       const ov = await MockStore.getAdminOverviewStats();
       setOverviewData(ov);
 
-      // 显示成功消息
-      setSyncMessage(`导入完成: 成功 ${result.success} 个, 跳过 ${result.skipped} 个`);
+      // Show success message
+      setSyncMessage(`Import completed: ${result.success} successful, ${result.skipped} skipped`);
       setTimeout(() => setSyncMessage(null), 5000);
 
       // 关闭模态框
@@ -495,8 +495,8 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       setImportFile(null);
       setImportResult(null);
     } catch (error) {
-      console.error('导入失败:', error);
-      setSyncMessage('导入失败，请重试');
+      console.error('Import failed:', error);
+      setSyncMessage('Import failed, please try again');
       setTimeout(() => setSyncMessage(null), 3000);
     } finally {
       setImporting(false);
@@ -514,43 +514,43 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   // 自动导入全部 KOL
   const handleAutoImportAll = async () => {
     setImporting(true);
-    setSyncMessage('正在自动导入所有 KOL...');
+    setSyncMessage('Auto-importing all KOLs...');
 
     try {
-      // 读取两个 CSV 文件
+      // Read both CSV files
       const response1 = await fetch('/KOL_Export_2025-12-16.csv');
       const file1Content = await response1.text();
 
       const response2 = await fetch('/博主合作数据库 2933f81ff51e808cbc21e9c140005179.csv');
       const file2Content = await response2.text();
 
-      // 解析和处理
+      // Parse and process
       const { users, stats } = await autoImportAllKOLs(file1Content, file2Content);
 
-      console.log('📊 导入统计:', stats);
+      console.log('📊 Import stats:', stats);
 
-      // 批量注册
+      // Batch register
       const result = await MockStore.batchRegister(users);
 
-      // 刷新列表
+      // Refresh list
       const updatedList = await MockStore.getAffiliates();
       setAffiliates(updatedList);
 
       const ov = await MockStore.getAdminOverviewStats();
       setOverviewData(ov);
 
-      // 显示结果
-      setSyncMessage(`🎉 自动导入完成！
-        总计: ${stats.total} 个 KOL
-        成功导入: ${result.success} 个
-        跳过重复: ${result.skipped} 个
+      // Show results
+      setSyncMessage(`🎉 Auto-import completed!
+        Total: ${stats.total} KOLs
+        Successfully imported: ${result.success}
+        Skipped duplicates: ${result.skipped}
         GOLD: ${stats.tierStats.gold} | SILVER: ${stats.tierStats.silver} | BRONZE: ${stats.tierStats.bronze}
-        有邮箱: ${stats.withEmail} | 无邮箱: ${stats.withoutEmail}`);
+        With email: ${stats.withEmail} | Without email: ${stats.withoutEmail}`);
 
       setTimeout(() => setSyncMessage(null), 10000);
     } catch (error) {
-      console.error('自动导入失败:', error);
-      setSyncMessage(`❌ 自动导入失败: ${error}`);
+      console.error('Auto-import failed:', error);
+      setSyncMessage(`❌ Auto-import failed: ${error}`);
       setTimeout(() => setSyncMessage(null), 5000);
     } finally {
       setImporting(false);
@@ -1214,12 +1214,12 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                      w.status === WithdrawalStatus.PENDING || w.status === WithdrawalStatus.PROCESSING
                    );
                    if (pendingWithdrawals.length === 0) {
-                     alert('没有待处理的提现');
+                     alert('No pending withdrawals');
                      return;
                    }
                    const confirmed = window.confirm(
-                     `确定要批量处理 ${pendingWithdrawals.length} 笔提现吗？\n` +
-                     `总金额: $${pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}\n\n` +
+                     `Confirm batch processing of ${pendingWithdrawals.length} withdrawal requests?\n` +
+                     `Total amount: $${pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}\n\n` +
                      `All withdrawals will be marked as "processing" status.`
                    );
                    if (confirmed) {
@@ -1229,10 +1229,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                          handleUpdateWithdrawalStatus(w.id, WithdrawalStatus.PROCESSING)
                        )
                      ).then(() => {
-                       alert('批量处理完成！');
+                       alert('Batch processing completed!');
                      }).catch(error => {
-                       console.error('批量处理失败:', error);
-                       alert('批量处理失败，请重试');
+                       console.error('Batch processing failed:', error);
+                       alert('Batch processing failed, please try again');
                      });
                    }
                  }}
@@ -1545,12 +1545,12 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                     e.stopPropagation();
                                                     // 确认删除
                                                     const confirmed = window.confirm(
-                                                        `确定要删除达人 "${aff.name}" (${aff.email}) 吗？\n\n` +
-                                                        `此操作将：\n` +
-                                                        `1. 删除该达人的所有数据\n` +
-                                                        `2. 删除其追踪链接和点击记录\n` +
-                                                        `3. 删除其提现记录\n\n` +
-                                                        `此操作不可撤销！`
+                                                        `Are you sure you want to delete affiliate "${aff.name}" (${aff.email})?\n\n` +
+                                                        `This operation will:\n` +
+                                                        `1. Delete all affiliate data\n` +
+                                                        `2. Delete tracking links and click records\n` +
+                                                        `3. Delete withdrawal records\n\n` +
+                                                        `This action cannot be undone!`
                                                     );
 
                                                     if (!confirmed) return;
@@ -1573,13 +1573,13 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                                             const ov = await MockStore.getAdminOverviewStats();
                                                             setOverviewData(ov);
 
-                                                            alert(`达人 "${aff.name}" 已成功删除`);
+                                                            alert(`Affiliate "${aff.name}" deleted successfully`);
                                                         } else {
-                                                            throw new Error('删除失败');
+                                                            throw new Error('Deletion failed');
                                                         }
                                                     } catch (error: any) {
                                                         console.error('删除达人失败:', error);
-                                                        alert(`删除失败：${error.message || '未知错误'}`);
+                                                        alert(`Deletion failed: ${error.message || 'Unknown error'}`);
                                                     }
                                                 }}
                                                 className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors"
@@ -2259,7 +2259,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                   onClick={() => {
                     // TODO: 保存规则到后端
                     console.log('保存自动审核规则:', autoReviewRules);
-                    alert('规则已保存！');
+                    alert('Rules saved!');
                     setShowAutoReviewModal(false);
                   }}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
