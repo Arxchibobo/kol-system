@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Task, TaskStatus, Tier, UserRole, TIER_RATES, WithdrawalRequest, WithdrawalStatus, ApprovalStatus } from '../types';
 import { MockStore } from '../services/mockStore';
 import { LayoutGrid, Plus, Users, DollarSign, Activity, Search, AlertTriangle, CheckCircle, BarChart3, FileText, RefreshCw, ChevronRight, Twitter, Youtube, ExternalLink, X, Wallet, Mail, Instagram, Award, Trash2, Upload, Settings as SettingsIcon, UserCheck, UserX } from 'lucide-react';
@@ -107,7 +107,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1FrjSNSrNZTMgWl1dDBZIOTWQOgEO7An9UKNxUmRepG0/edit?gid=1698530545#gid=1698530545";
 
   // 获取真实的全局统计数据
-  const fetchRealTotalStats = async () => {
+  const fetchRealTotalStats = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/total-stats');
       if (response.ok) {
@@ -117,10 +117,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     } catch (error) {
       console.error('Failed to fetch total stats:', error);
     }
-  };
+  }, []);
 
   // 获取异常预警数据
-  const fetchAnomalies = async () => {
+  const fetchAnomalies = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/anomalies');
       if (response.ok) {
@@ -131,10 +131,10 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     } catch (error) {
       console.error('Failed to fetch anomalies:', error);
     }
-  };
+  }, []);
 
   // 全局刷新所有数据
-  const handleRefreshAll = async () => {
+  const handleRefreshAll = useCallback(async () => {
     setRefreshing(true);
     try {
       const taskList = await MockStore.getTasks(user.role);
@@ -160,7 +160,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     } finally {
       setTimeout(() => setRefreshing(false), 500);
     }
-  };
+  }, [user.role, user.id, fetchRealTotalStats, fetchAnomalies]); // 依赖于 user 和其他函数
 
   // Real-time sync: refresh immediately on component load, then auto-refresh every 10 seconds
   useEffect(() => {
@@ -180,7 +180,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       console.log('🛑 Stopping auto-sync');
       clearInterval(intervalId);
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, [handleRefreshAll]); // 依赖于 handleRefreshAll
 
   const openCreateModal = () => {
       setEditingTaskId(null);
