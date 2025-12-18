@@ -1298,12 +1298,16 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   };
 
   const renderAffiliates = () => {
-    // 根据搜索和标签筛选达人
+    // 添加等级筛选状态
+    const [selectedTier, setSelectedTier] = React.useState<string>('全部');
+
+    // 根据搜索、标签和等级筛选达人
     const filteredAffiliates = affiliates.filter(a => {
         const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                              a.email.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesTag = selectedTag === '全部' || (a.tags && a.tags.includes(selectedTag));
-        return matchesSearch && matchesTag;
+        const matchesTier = selectedTier === '全部' || a.tier === selectedTier;
+        return matchesSearch && matchesTag && matchesTier;
     });
 
     // 统计每个标签的达人数量
@@ -1396,6 +1400,21 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                 </div>
             )}
 
+            {/* 等级筛选下拉框 */}
+            <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">等级筛选:</label>
+                <select
+                    value={selectedTier}
+                    onChange={(e) => setSelectedTier(e.target.value)}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                >
+                    <option value="全部">全部等级</option>
+                    <option value={Tier.CORE_PARTNER}>基础合作伙伴 (CORE_PARTNER)</option>
+                    <option value={Tier.PREMIUM_INFLUENCER}>高级影响者 (PREMIUM_INFLUENCER)</option>
+                    <option value={Tier.OFFICIAL_COLLABORATOR}>官方合作者 (OFFICIAL_COLLABORATOR)</option>
+                </select>
+            </div>
+
             {/* 标签筛选按钮组 */}
             <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -1431,6 +1450,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                             <th className="px-6 py-4 font-medium">{t('admin.colTier')}</th>
                             <th className="px-6 py-4 font-medium">{t('admin.colFollowers')}</th>
                             <th className="px-6 py-4 font-medium">{t('admin.colEarnings')}</th>
+                            <th className="px-6 py-4 font-medium text-center">操作</th>
                             <th className="px-6 py-4 font-medium w-20"></th>
                         </tr>
                     </thead>
@@ -1482,6 +1502,55 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                         <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-mono">
                                             ${aff.totalEarnings?.toLocaleString() ?? 0}
                                         </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    // 确认删除
+                                                    const confirmed = window.confirm(
+                                                        `确定要删除达人 "${aff.name}" (${aff.email}) 吗？\n\n` +
+                                                        `此操作将：\n` +
+                                                        `1. 删除该达人的所有数据\n` +
+                                                        `2. 删除其追踪链接和点击记录\n` +
+                                                        `3. 删除其提现记录\n\n` +
+                                                        `此操作不可撤销！`
+                                                    );
+
+                                                    if (!confirmed) return;
+
+                                                    try {
+                                                        // 调用后端API删除数据库记录
+                                                        const response = await fetch(`/api/user/${aff.id}`, {
+                                                            method: 'DELETE',
+                                                        });
+
+                                                        if (response.ok) {
+                                                            // 从 MockStore 中删除
+                                                            await MockStore.deleteAffiliate(aff.id);
+
+                                                            // 刷新列表
+                                                            const updatedList = await MockStore.getAffiliates();
+                                                            setAffiliates(updatedList);
+
+                                                            // 更新概览数据
+                                                            const ov = await MockStore.getAdminOverviewStats();
+                                                            setOverviewData(ov);
+
+                                                            alert(`达人 "${aff.name}" 已成功删除`);
+                                                        } else {
+                                                            throw new Error('删除失败');
+                                                        }
+                                                    } catch (error: any) {
+                                                        console.error('删除达人失败:', error);
+                                                        alert(`删除失败：${error.message || '未知错误'}`);
+                                                    }
+                                                }}
+                                                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors"
+                                                title="删除达人"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
                                         <td className="px-6 py-4 text-right">
                                             <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                                                 <ChevronRight size={16} className={`transition-transform duration-200 ${expandedRows.has(aff.id) ? 'rotate-90' : ''}`}/>
@@ -1491,7 +1560,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                                     {/* Expanded Detail Row */}
                                     {expandedRows.has(aff.id) && (
                                         <tr className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800">
-                                            <td colSpan={5} className="px-6 py-4">
+                                            <td colSpan={6} className="px-6 py-4">
                                                 <div className="flex flex-col md:flex-row gap-6 p-2">
                                                     <div className="space-y-4 flex-1">
                                                         <h4 className="text-sm font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">{t('admin.viewProfile')}</h4>

@@ -59,9 +59,16 @@ let MOCK_AFFILIATE_TASKS: AffiliateTask[] = [];
 // --- Persistence Logic ---
 const loadData = () => {
     try {
-        // ⚠️ 不再从 localStorage 加载 tasks，改为从后端数据库获取
-        // 这样可以确保每次启动都获取最新的、持久化的数据
-        MOCK_TASKS = []; // 初始化为空数组，由 getTasks() 从后端加载
+        // 🔧 修复：优先从 localStorage 加载 tasks 作为备份
+        // 如果后端数据库为空（首次部署或数据丢失），可以从 localStorage 恢复
+        const storedTasks = localStorage.getItem(STORAGE_KEY_TASKS);
+        if (storedTasks) {
+            MOCK_TASKS = JSON.parse(storedTasks);
+            console.log(`[loadData] 从 localStorage 加载 ${MOCK_TASKS.length} 个任务作为初始数据`);
+        } else {
+            MOCK_TASKS = [];
+            console.log('[loadData] localStorage 无任务数据，初始化为空数组');
+        }
 
         const storedAffiliates = localStorage.getItem(STORAGE_KEY_AFFILIATES);
         if (storedAffiliates) {
@@ -74,7 +81,7 @@ const loadData = () => {
         }
     } catch (e) {
         console.error("Failed to load mock data from storage", e);
-        MOCK_TASKS = []; // 改为空数组
+        MOCK_TASKS = [];
     }
 };
 
@@ -364,11 +371,36 @@ export const MockStore = {
       if (response.ok) {
         const backendTasks = await response.json();
 
-        // 更新本地缓存
-        MOCK_TASKS = backendTasks;
-        saveData();
+        // 🔧 修复：如果后端数据为空但本地有数据，将本地数据同步回后端
+        if (backendTasks.length === 0 && MOCK_TASKS.length > 0) {
+          console.warn('⚠️ 后端数据为空，但本地有 ' + MOCK_TASKS.length + ' 个任务，正在同步回后端...');
 
-        console.log(`✅ 从后端成功获取 ${backendTasks.length} 个任务`);
+          // 将本地任务同步到后端
+          for (const task of MOCK_TASKS) {
+            try {
+              await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(task)
+              });
+              console.log(`✅ 任务 "${task.title}" 已同步到后端`);
+            } catch (e) {
+              console.error(`❌ 同步任务 "${task.title}" 失败:`, e);
+            }
+          }
+
+          // 同步完成后，返回本地数据
+          console.log('✅ 数据同步完成，使用本地数据');
+          return JSON.parse(JSON.stringify(MOCK_TASKS));
+        }
+
+        // 如果后端有数据，更新本地缓存
+        if (backendTasks.length > 0) {
+          MOCK_TASKS = backendTasks;
+          saveData();
+          console.log(`✅ 从后端成功获取 ${backendTasks.length} 个任务`);
+        }
+
         return JSON.parse(JSON.stringify(backendTasks));
       } else {
         console.warn(`⚠️ 后端返回错误状态: ${response.status}`);
@@ -796,6 +828,17 @@ export const MockStore = {
       MOCK_AFFILIATES[index] = user;
       saveData();
     }
+  },
+
+  deleteAffiliate: async (userId: string) => {
+    // 从达人列表中删除
+    MOCK_AFFILIATES = MOCK_AFFILIATES.filter(u => u.id !== userId);
+
+    // 删除该达人的所有任务
+    MOCK_AFFILIATE_TASKS = MOCK_AFFILIATE_TASKS.filter(at => at.affiliateId !== userId);
+
+    saveData();
+    console.log(`[MockStore] 已删除达人: ${userId}`);
   },
 
   syncKOLs: async () => {

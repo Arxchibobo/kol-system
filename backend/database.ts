@@ -1291,3 +1291,110 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
         return 0;
     }
 }
+
+// ----------------------------------------------------------------------
+// 删除用户账户（级联删除所有相关数据）
+// ----------------------------------------------------------------------
+export async function deleteUserCascade(userId: string): Promise<{
+    profileDeleted: boolean;
+    clicksDeleted: number;
+    linksDeleted: number;
+    notificationsDeleted: number;
+    withdrawalsDeleted: number;
+}> {
+    if (!db) throw new Error("Database not initialized");
+
+    const result = {
+        profileDeleted: false,
+        clicksDeleted: 0,
+        linksDeleted: 0,
+        notificationsDeleted: 0,
+        withdrawalsDeleted: 0
+    };
+
+    try {
+        console.log(`[DB] 开始级联删除用户: ${userId}`);
+
+        // 1. 删除用户的追踪链接和点击记录
+        try {
+            const linkIdsQuery = `SELECT id FROM tracking_links WHERE creator_user_id = ?`;
+            const linkRows = db.exec(linkIdsQuery, [userId]);
+
+            let linkIds: any[] = [];
+            if (linkRows.length > 0 && linkRows[0].values.length > 0) {
+                linkIds = linkRows[0].values.map(row => row[0]);
+                console.log(`[DB] 找到 ${linkIds.length} 条追踪链接`);
+
+                // 删除点击记录
+                if (linkIds.length > 0) {
+                    try {
+                        // 统计点击数
+                        const clickCountQuery = `SELECT COUNT(*) FROM clicks WHERE link_id IN (${linkIds.map(() => '?').join(',')})`;
+                        const clickCountResult = db.exec(clickCountQuery, linkIds);
+                        if (clickCountResult.length > 0 && clickCountResult[0].values.length > 0) {
+                            result.clicksDeleted = clickCountResult[0].values[0][0] as number;
+                        }
+
+                        // 删除点击记录
+                        const deleteClicksQuery = `DELETE FROM clicks WHERE link_id IN (${linkIds.map(() => '?').join(',')})`;
+                        db.run(deleteClicksQuery, linkIds);
+                        console.log(`[DB] 删除了 ${result.clicksDeleted} 条点击记录`);
+                    } catch (e) {
+                        console.warn('[DB] 删除点击记录时出错（可能表不存在）:', e);
+                    }
+                }
+
+                // 删除追踪链接
+                db.run(`DELETE FROM tracking_links WHERE creator_user_id = ?`, [userId]);
+                result.linksDeleted = linkIds.length;
+                console.log(`[DB] 删除了 ${result.linksDeleted} 条追踪链接`);
+            }
+        } catch (e) {
+            console.warn('[DB] 删除追踪链接时出错（可能表不存在）:', e);
+        }
+
+        // 2. 删除用户的通知
+        try {
+            const notifCountQuery = `SELECT COUNT(*) FROM notifications WHERE user_id = ?`;
+            const notifCountResult = db.exec(notifCountQuery, [userId]);
+            if (notifCountResult.length > 0 && notifCountResult[0].values.length > 0) {
+                result.notificationsDeleted = notifCountResult[0].values[0][0] as number;
+            }
+
+            db.run(`DELETE FROM notifications WHERE user_id = ?`, [userId]);
+            console.log(`[DB] 删除了 ${result.notificationsDeleted} 条通知`);
+        } catch (e) {
+            console.warn('[DB] 删除通知时出错（可能表不存在）:', e);
+        }
+
+        // 3. 删除用户的提现记录
+        try {
+            const withdrawalCountQuery = `SELECT COUNT(*) FROM withdrawal_requests WHERE affiliate_id = ?`;
+            const withdrawalCountResult = db.exec(withdrawalCountQuery, [userId]);
+            if (withdrawalCountResult.length > 0 && withdrawalCountResult[0].values.length > 0) {
+                result.withdrawalsDeleted = withdrawalCountResult[0].values[0][0] as number;
+            }
+
+            db.run(`DELETE FROM withdrawal_requests WHERE affiliate_id = ?`, [userId]);
+            console.log(`[DB] 删除了 ${result.withdrawalsDeleted} 条提现记录`);
+        } catch (e) {
+            console.warn('[DB] 删除提现记录时出错（可能表不存在）:', e);
+        }
+
+        // 4. 删除用户资料
+        try {
+            db.run(`DELETE FROM user_profiles WHERE user_id = ?`, [userId]);
+            result.profileDeleted = true;
+            console.log(`[DB] 删除了用户资料`);
+        } catch (e) {
+            console.warn('[DB] 删除用户资料时出错（可能表不存在）:', e);
+        }
+
+        console.log(`[DB] 用户 ${userId} 级联删除完成:`, result);
+        return result;
+
+    } catch (error) {
+        console.error('[DB] 删除用户时出错:', error);
+        throw error;
+    }
+}

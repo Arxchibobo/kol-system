@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, getAllTasks, createTask, updateTask, getTaskById, createWithdrawalRequest, getAllWithdrawalRequests, getWithdrawalRequestsByAffiliate, updateWithdrawalStatus } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, deleteUserCascade, getAllTasks, createTask, updateTask, getTaskById, createWithdrawalRequest, getAllWithdrawalRequests, getWithdrawalRequestsByAffiliate, updateWithdrawalStatus } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -285,28 +285,29 @@ ${feedback}
     }
 });
 
-// 删除用户账户
+// 删除用户账户（级联删除所有相关数据）
 app.delete('/api/user/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
 
         console.log(`[API] 删除用户账户请求: ${userId}`);
 
-        // TODO: 实际删除用户数据
-        // 1. 删除用户资料
-        // 2. 删除用户任务
-        // 3. 删除关联的追踪链接
-        // 4. 记录删除日志
+        // 调用数据库级联删除函数
+        const result = await deleteUserCascade(userId);
 
-        console.log(`[API] 用户账户已删除: ${userId}`);
+        console.log(`[API] 用户账户已删除: ${userId}`, result);
 
         res.json({
             success: true,
-            message: 'Account deleted successfully'
+            message: 'Account deleted successfully',
+            deleted: result
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('[API] Delete User Error:', error);
-        res.status(500).json({ error: 'Failed to delete user' });
+        res.status(500).json({
+            error: 'Failed to delete user',
+            message: error.message || '未知错误'
+        });
     }
 });
 

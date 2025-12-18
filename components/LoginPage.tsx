@@ -335,8 +335,16 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
                     <div className="mt-6 text-center">
                         <p className="text-sm text-slate-500">
                             {isRegistering ? t('login.hasAccount') : t('login.noAccount')}{' '}
-                            <button 
-                                onClick={() => setIsRegistering(!isRegistering)}
+                            <button
+                                onClick={() => {
+                                    if (isRegistering) {
+                                        // 从注册切换到登录，直接切换
+                                        setIsRegistering(false);
+                                    } else {
+                                        // 从登录切换到注册，先显示重要提示弹窗
+                                        setShowImportantNotice(true);
+                                    }
+                                }}
                                 className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-medium"
                             >
                                 {isRegistering ? t('login.enter') : t('login.register')}

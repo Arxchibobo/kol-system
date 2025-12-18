@@ -885,15 +885,24 @@ export const AffiliateDashboard: React.FC<Props> = ({ user: initialUser, onLogou
             
             return (
                 <div key={at.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 transition-colors relative group">
-                    {/* Give Up Button (Only for CLAIMED status) */}
+                    {/* Give Up Button - 🔧 修复：改进可见性，始终显示按钮 */}
                     {at.status === 'CLAIMED' && (
-                        <button 
-                            onClick={() => handleGiveUp(at.id)}
-                            className="absolute top-4 right-4 text-slate-400 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
-                            title={t('affiliate.giveUp')}
+                        <button
+                            onClick={() => {
+                                console.log('[达人端] 点击放弃任务按钮:', at.id, '状态:', at.status);
+                                handleGiveUp(at.id);
+                            }}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-slate-200 dark:border-slate-700 hover:border-red-300 dark:hover:border-red-600"
+                            title="放弃任务 (Release Task)"
                         >
-                            <Trash2 size={16} />
+                            <Trash2 size={18} />
                         </button>
+                    )}
+                    {/* 🔧 调试信息：显示任务状态 */}
+                    {process.env.NODE_ENV === 'development' && (
+                        <div className="absolute top-4 left-4 text-xs text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                            状态: {at.status}
+                        </div>
                     )}
 
                     <div className="flex flex-col md:flex-row gap-6">
