@@ -664,7 +664,13 @@ export const MockStore = {
       if (response.ok) {
         const participants = await response.json();
         console.log('[MockStore] 从后端获取任务参与者:', participants.length);
-        return participants;
+
+        // 🔧 修复：如果后端返回空数组，尝试使用本地数据作为 fallback
+        if (participants.length === 0) {
+          console.log('[MockStore] 后端返回空数据，尝试使用本地 localStorage 数据');
+        } else {
+          return participants;
+        }
       }
     } catch (error: any) {
       console.log('[MockStore] 后端不可用，使用本地数据');
