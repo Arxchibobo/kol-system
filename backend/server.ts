@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { cwd } from 'node:process';
-import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, deleteUserCascade, getAllTasks, createTask, updateTask, getTaskById, createWithdrawalRequest, getAllWithdrawalRequests, getWithdrawalRequestsByAffiliate, updateWithdrawalStatus } from './database';
+import { initDB, createLink, getLinkByCode, logClick, getStatsByCreator, getStatsByCreatorAndTask, getDailyStats, getCreatorDetailedStats, getAllTotalStats, detectAnomalies, updateUserProfile, getUserProfile, deleteTaskCascade, deleteUserCascade, getAllTasks, createTask, updateTask, getTaskById, createWithdrawalRequest, getAllWithdrawalRequests, getWithdrawalRequestsByAffiliate, updateWithdrawalStatus } from './database';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -159,6 +159,19 @@ app.get('/api/stats/affiliate/:userId/task/:taskId', async (req, res) => {
     } catch (error) {
         console.error('[API] 获取任务点击统计失败:', error);
         res.status(500).json({ error: 'Failed to get task stats' });
+    }
+});
+
+// 获取过去7天的每日点击统计（用于图表显示）
+app.get('/api/stats/daily/:userId?', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const stats = await getDailyStats(userId);
+        console.log(`[API] 获取每日统计${userId ? ` (达人: ${userId})` : ' (全局)'}:`, stats);
+        res.json(stats);
+    } catch (error) {
+        console.error('[API] 获取每日统计失败:', error);
+        res.status(500).json({ error: 'Failed to fetch daily stats' });
     }
 });
 

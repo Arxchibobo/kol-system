@@ -731,18 +731,50 @@ export const MockStore = {
   },
 
   getStats: async (userId: string, role: UserRole) => {
-    const data = [];
-    const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      data.push({
-        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        clicks: Math.floor(Math.random() * 500) + 50,
-        valid: Math.floor(Math.random() * 300) + 20,
-      });
+    try {
+      // 调用后端 API 获取真实的每日统计数据
+      const endpoint = role === UserRole.ADMIN
+        ? '/api/stats/daily'  // 运营侧获取全局统计
+        : `/api/stats/daily/${userId}`;  // 达人侧获取个人统计
+
+      const response = await fetch(endpoint);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[MockStore] 获取每日统计成功 (${role}):`, data);
+        return data;
+      } else {
+        console.warn(`[MockStore] 获取每日统计失败, 使用空数据`);
+        // 返回空数据作为 fallback
+        const data = [];
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          data.push({
+            date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            clicks: 0,
+            valid: 0,
+          });
+        }
+        return data;
+      }
+    } catch (error) {
+      console.error('[MockStore] 获取每日统计失败:', error);
+      // 返回空数据作为 fallback
+      const data = [];
+      const now = new Date();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        data.push({
+          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          clicks: 0,
+          valid: 0,
+        });
+      }
+      return data;
     }
-    return data;
   },
 
   createTask: async (task: Task) => {

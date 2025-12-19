@@ -215,6 +215,93 @@ export async function getStatsByCreator(creatorId: string) {
 }
 
 /**
+ * 获取达人过去7天的每日点击统计（用于图表显示）
+ * @param creatorId - 达人用户 ID，如果为空则获取全局统计
+ * @returns 7天的每日点击数据数组
+ */
+export async function getDailyStats(creatorId?: string) {
+    const database = await initDB();
+
+    try {
+        // 构建 SQL 查询
+        let query = `
+            SELECT
+                DATE(clicks.clicked_at) as date,
+                COUNT(*) as clicks,
+                COUNT(*) as valid
+            FROM clicks
+            JOIN links ON clicks.link_id = links.id
+        `;
+
+        const params: any[] = [];
+
+        // 如果指定了达人ID，则只统计该达人的数据
+        if (creatorId) {
+            query += ` WHERE links.creator_user_id = ?`;
+            params.push(creatorId);
+        }
+
+        // 按日期分组，获取过去7天的数据
+        query += `
+            AND DATE(clicks.clicked_at) >= DATE('now', '-7 days')
+            GROUP BY DATE(clicks.clicked_at)
+            ORDER BY date ASC
+        `;
+
+        const result = database.exec(query, params);
+
+        // 生成过去7天的完整日期列表
+        const now = new Date();
+        const data = [];
+
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
+            const displayDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+            // 查找数据库中是否有该日期的数据
+            let clicks = 0;
+            let valid = 0;
+
+            if (result.length > 0 && result[0].values.length > 0) {
+                for (const row of result[0].values) {
+                    if (row[0] === dateStr) {
+                        clicks = Number(row[1]) || 0;
+                        valid = Number(row[2]) || 0;
+                        break;
+                    }
+                }
+            }
+
+            data.push({
+                date: displayDate,
+                clicks: clicks,
+                valid: valid
+            });
+        }
+
+        console.log(`[DB] 获取每日统计${creatorId ? ` (达人: ${creatorId})` : ' (全局)'}:`, data);
+        return data;
+    } catch (error) {
+        console.error('[DB] 获取每日统计失败:', error);
+        // 返回空数据
+        const now = new Date();
+        const data = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            data.push({
+                date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                clicks: 0,
+                valid: 0
+            });
+        }
+        return data;
+    }
+}
+
+/**
  * 获取指定达人和任务的点击统计
  * @param creatorId - 达人用户 ID
  * @param taskId - 任务 ID
