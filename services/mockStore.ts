@@ -700,14 +700,18 @@ export const MockStore = {
         // 🔧 尝试从后端获取实时点击数据
         let clickCount = at.stats?.totalClicks || 0;
         try {
-          const clickResponse = await fetch(`/api/tracking-links/stats?creator_user_id=${at.affiliateId}&task_id=${taskId}`);
+          // 🔧 修复：使用正确的后端 API 路径
+          const clickResponse = await fetch(`/api/stats/affiliate/${at.affiliateId}/task/${taskId}`);
           if (clickResponse.ok) {
             const clickData = await clickResponse.json();
-            clickCount = clickData.click_count || 0;
+            // 后端返回的数据格式: { totalClicks, validClicks, conversionRate, estimatedEarnings }
+            clickCount = clickData.totalClicks || 0;
             console.log(`[MockStore] 达人 ${affiliate?.name} 的点击数: ${clickCount}`);
+          } else {
+            console.log(`[MockStore] API 返回错误状态: ${clickResponse.status}`);
           }
         } catch (e) {
-          console.log('[MockStore] 无法获取实时点击数，使用本地数据');
+          console.log('[MockStore] 无法获取实时点击数，使用本地数据:', e);
         }
 
         return {
