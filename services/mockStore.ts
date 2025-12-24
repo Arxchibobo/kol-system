@@ -228,6 +228,20 @@ export const MockStore = {
     console.log('[MockStore] 当前 MOCK_AFFILIATES 数量:', MOCK_AFFILIATES.length);
     console.log('[MockStore] 当前待审核用户数量:', MOCK_AFFILIATES.filter(u => u.approvalStatus === ApprovalStatus.PENDING).length);
 
+    // 🔧 验证 localStorage 是否成功保存
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY_AFFILIATES);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            console.log('[MockStore] ✅ localStorage 已保存，用户数:', parsed.length);
+            console.log('[MockStore] localStorage 中待审核用户:', parsed.filter((u: User) => u.approvalStatus === ApprovalStatus.PENDING).length);
+        } else {
+            console.warn('[MockStore] ⚠️ localStorage 为空！');
+        }
+    } catch (e) {
+        console.error('[MockStore] ❌ 验证 localStorage 失败:', e);
+    }
+
     // 同步到后端数据库
     try {
         await fetch(`/api/user/profile/${newUser.id}`, {
@@ -1250,7 +1264,26 @@ export const MockStore = {
   // 获取待审核的达人列表
   getPendingAffiliates: async (): Promise<User[]> => {
     await new Promise(r => setTimeout(r, 100));
-    return MOCK_AFFILIATES.filter(u => u.approvalStatus === ApprovalStatus.PENDING);
+
+    // 🔧 调试日志：显示所有用户和待审核用户
+    console.log('[MockStore] 总用户数:', MOCK_AFFILIATES.length);
+    console.log('[MockStore] 所有用户:', MOCK_AFFILIATES.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        approvalStatus: u.approvalStatus
+    })));
+
+    const pending = MOCK_AFFILIATES.filter(u => u.approvalStatus === ApprovalStatus.PENDING);
+    console.log('[MockStore] 待审核用户数:', pending.length);
+    console.log('[MockStore] 待审核用户详情:', pending.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        approvalStatus: u.approvalStatus
+    })));
+
+    return pending;
   },
 
   // 批准达人
