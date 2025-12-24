@@ -100,8 +100,18 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
             }
         });
 
+        // 🔧 调试日志：检查注册返回的用户状态
+        console.log('[LoginPage] 注册返回的用户:', {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            approvalStatus: user.approvalStatus,
+            approvalStatusType: typeof user.approvalStatus
+        });
+
         // 检查审核状态
         if (user.approvalStatus === 'PENDING') {
+          console.log('[LoginPage] ✅ 用户状态为 PENDING，阻止登录');
           alert('Registration submitted successfully! Your account is pending approval by the admin team. You will be notified once approved.');
           // 不允许登录，返回登录页面
           setIsRegistering(false);
@@ -109,6 +119,7 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
           return;
         }
 
+        console.log('[LoginPage] ⚠️ 用户状态不是 PENDING，允许登录');
         onLogin(user);
     } catch (e) {
         console.error(e);
