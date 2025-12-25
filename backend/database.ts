@@ -79,10 +79,24 @@ export async function initDB() {
                 social_links TEXT,
                 total_earnings REAL DEFAULT 0,
                 pending_earnings REAL DEFAULT 0,
+                approval_status TEXT DEFAULT 'APPROVED',
+                rejection_reason TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
         `);
+
+        // Add approval_status column to existing tables (migration)
+        try {
+            db.run(`ALTER TABLE users ADD COLUMN approval_status TEXT DEFAULT 'APPROVED';`);
+        } catch (e) {
+            // Column already exists, ignore error
+        }
+        try {
+            db.run(`ALTER TABLE users ADD COLUMN rejection_reason TEXT;`);
+        } catch (e) {
+            // Column already exists, ignore error
+        }
 
         // 4. 任务表 (存储运营后台创建的所有任务)
         db.run(`
@@ -502,6 +516,8 @@ export async function updateUserProfile(userId: string, data: {
     socialLinks?: any;
     totalEarnings?: number;
     pendingEarnings?: number;
+    approvalStatus?: string;
+    rejectionReason?: string;
 }) {
     const database = await initDB();
 
@@ -514,8 +530,8 @@ export async function updateUserProfile(userId: string, data: {
     if (existingUser.length === 0 || existingUser[0].values.length === 0) {
         // 用户不存在,插入新记录（包含所有字段）
         database.run(
-            `INSERT INTO users (id, name, email, follower_count, tags, avatar, tier, wallet_address, social_links, total_earnings, pending_earnings, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            `INSERT INTO users (id, name, email, follower_count, tags, avatar, tier, wallet_address, social_links, total_earnings, pending_earnings, approval_status, rejection_reason, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
             [
                 userId,
                 data.name || '',
@@ -527,7 +543,9 @@ export async function updateUserProfile(userId: string, data: {
                 data.walletAddress || '',
                 socialLinksJson,
                 data.totalEarnings || 0,
-                data.pendingEarnings || 0
+                data.pendingEarnings || 0,
+                data.approvalStatus || 'APPROVED',
+                data.rejectionReason || null
             ]
         );
     } else {
@@ -574,6 +592,14 @@ export async function updateUserProfile(userId: string, data: {
         if (data.pendingEarnings !== undefined) {
             updates.push('pending_earnings = ?');
             values.push(data.pendingEarnings);
+        }
+        if (data.approvalStatus !== undefined) {
+            updates.push('approval_status = ?');
+            values.push(data.approvalStatus);
+        }
+        if (data.rejectionReason !== undefined) {
+            updates.push('rejection_reason = ?');
+            values.push(data.rejectionReason);
         }
 
         updates.push('updated_at = CURRENT_TIMESTAMP');
@@ -625,6 +651,18 @@ export async function getUserProfile(userId: string) {
         } catch (e) {
             row.socialLinks = null;
         }
+    }
+
+    // 映射 approval_status 为 approvalStatus (驼峰命名)
+    if (row.approval_status !== undefined) {
+        row.approvalStatus = row.approval_status;
+        delete row.approval_status;
+    }
+
+    // 映射 rejection_reason 为 rejectionReason (驼峰命名)
+    if (row.rejection_reason !== undefined) {
+        row.rejectionReason = row.rejection_reason;
+        delete row.rejection_reason;
     }
 
     return row;

@@ -417,26 +417,29 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
         followerCount: newKol.followerCount,
         socialLinks: newKol.socialLinks,
         walletAddress: '',
-        tags: newKol.tags || []
+        tags: newKol.tags || [],
+        approvalStatus: ApprovalStatus.APPROVED  // 管理员手动添加的用户默认已批准
     };
 
     // 添加达人到 MockStore
     await MockStore.addAffiliate(userToAdd);
 
-    // 保存标签到数据库
-    if (newKol.tags && newKol.tags.length > 0) {
-        await fetch(`/api/user/profile/${userToAdd.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                followerCount: newKol.followerCount,
-                tags: newKol.tags,
-                name: newKol.name,
-                email: newKol.email,
-                avatar: userToAdd.avatar
-            })
-        });
-    }
+    // 保存用户资料到数据库（包括 approvalStatus）
+    await fetch(`/api/user/profile/${userToAdd.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            followerCount: newKol.followerCount,
+            tags: newKol.tags || [],
+            name: newKol.name,
+            email: newKol.email,
+            avatar: userToAdd.avatar,
+            tier: userToAdd.tier,
+            socialLinks: userToAdd.socialLinks,
+            walletAddress: userToAdd.walletAddress,
+            approvalStatus: ApprovalStatus.APPROVED  // 确保后端也保存审批状态
+        })
+    });
 
     const updatedList = await MockStore.getAffiliates();
     const ov = await MockStore.getAdminOverviewStats();

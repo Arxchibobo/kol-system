@@ -148,6 +148,14 @@ export const MockStore = {
                 foundAffiliate.totalEarnings = profile.total_earnings || foundAffiliate.totalEarnings || 0;
                 foundAffiliate.pendingEarnings = profile.pending_earnings || foundAffiliate.pendingEarnings || 0;
 
+                // 🔧 修复：同步审批状态（从后端数据库获取最新状态）
+                if (profile.approvalStatus !== undefined) {
+                    foundAffiliate.approvalStatus = profile.approvalStatus;
+                }
+                if (profile.rejectionReason !== undefined) {
+                    foundAffiliate.rejectionReason = profile.rejectionReason;
+                }
+
                 // 同步 socialLinks 字段（防止 Profile 页面崩溃）
                 // 后端返回的字段名是 socialLinks（驼峰命名）
                 if (profile.socialLinks) {
@@ -253,7 +261,9 @@ export const MockStore = {
                 avatar: newUser.avatar,
                 followerCount: newUser.followerCount,
                 socialLinks: newUser.socialLinks,
-                walletAddress: newUser.walletAddress
+                walletAddress: newUser.walletAddress,
+                approvalStatus: newUser.approvalStatus,  // 同步审批状态
+                tier: newUser.tier
             })
         });
         console.log(`✅ 新用户资料已同步到后端: ${newUser.id}`);
@@ -350,7 +360,8 @@ export const MockStore = {
           socialLinks: userData.socialLinks || {},
           walletAddress: userData.walletAddress || '',
           tags: userData.tags || [],
-          notificationSettings: userData.notificationSettings || { newTaskAlert: true }
+          notificationSettings: userData.notificationSettings || { newTaskAlert: true },
+          approvalStatus: ApprovalStatus.APPROVED  // 批量导入的用户默认已批准
         };
 
         MOCK_AFFILIATES.unshift(newUser);
@@ -369,7 +380,8 @@ export const MockStore = {
               followerCount: newUser.followerCount,
               socialLinks: newUser.socialLinks,
               walletAddress: newUser.walletAddress,
-              tags: newUser.tags
+              tags: newUser.tags,
+              approvalStatus: ApprovalStatus.APPROVED  // 同步审批状态到后端
             })
           });
         } catch (e) {
